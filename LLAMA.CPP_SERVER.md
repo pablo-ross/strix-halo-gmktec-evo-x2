@@ -260,18 +260,19 @@ sudo nano /etc/systemd/system/llama-server.service
 
 ```ini
 [Unit]
-Description=llama.cpp Server - Llama 2 7B
+Description=llama.cpp - Llama-2-7B
 After=network.target
 
 [Service]
 Type=simple
-User=mornel
-WorkingDirectory=/home/mornel
-ExecStart=/usr/bin/distrobox enter llama-rocm-7rc-rocwmma -- /home/mornel/llama.cpp/build/bin/llama-server -m /home/mornel/models/llama-2-7b.Q4_K_M.gguf --host 0.0.0.0 --port 8080 -ngl 99 --no-mmap -c 4096
+User=username
+WorkingDirectory=/home/username
+ExecStart=/home/username/wrappers/llama-server-wrapper.sh
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
 
 [Install]
 WantedBy=multi-user.target
@@ -282,6 +283,36 @@ WantedBy=multi-user.target
 - Context size (`-c`)
 - Port number (`--port`)
 - Parallel requests (`--parallel`)
+
+### Create Systemd Wrapper
+
+```bash
+# Create service file
+nano /home/username/wrappers/llama-server-wrapper.sh
+```
+
+**Add this content:**
+
+```bash
+#!/bin/bash
+
+# Wrapper script for llama-server in distrobox
+# This script is needed because systemd can't execute distrobox enter directly
+
+# Ensure XDG_RUNTIME_DIR is set for podman
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+
+# Execute llama-server inside the distrobox container
+exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
+  /home/username/llama.cpp/build/bin/llama-server \
+  -m /home/username/models/llama-2-7b-chat.Q4_K_M.gguf \
+  --host 0.0.0.0 \
+  --port 8080 \
+  -ngl 99 \
+  --no-mmap \
+  -c 8192
+```
+
 
 ### Enable and Start Service
 
@@ -699,8 +730,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=mornel
-ExecStart=/usr/bin/distrobox enter llama-rocm-7rc-rocwmma -- /home/mornel/llama.cpp/build/bin/llama-server -m /home/mornel/models/llama-2-7b.Q4_K_M.gguf --host 0.0.0.0 --port 8080 -ngl 99 --no-mmap -c 4096 --parallel 4
+User=username
+ExecStart=/usr/bin/distrobox enter llama-rocm-7rc-rocwmma -- /home/username/llama.cpp/build/bin/llama-server -m /home/username/models/llama-2-7b.Q4_K_M.gguf --host 0.0.0.0 --port 8080 -ngl 99 --no-mmap -c 4096 --parallel 4
 Restart=on-failure
 RestartSec=10
 
@@ -716,8 +747,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=mornel
-ExecStart=/usr/bin/distrobox enter llama-rocm-7rc-rocwmma -- /home/mornel/llama.cpp/build/bin/llama-server -m /home/mornel/models/llama-70b.Q4_K_M.gguf --host 0.0.0.0 --port 8081 -ngl 99 --no-mmap -c 8192 --parallel 2
+User=username
+ExecStart=/usr/bin/distrobox enter llama-rocm-7rc-rocwmma -- /home/username/llama.cpp/build/bin/llama-server -m /home/username/models/llama-70b.Q4_K_M.gguf --host 0.0.0.0 --port 8081 -ngl 99 --no-mmap -c 8192 --parallel 2
 Restart=on-failure
 RestartSec=10
 
