@@ -1,0 +1,15 @@
+# Claude Code local settings (user-specific)
+.claude/
+
+# Temporary files
+*.tmp
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Backup files
+*~
+*.bak
