@@ -24,7 +24,9 @@
       "Bash(sudo systemctl:*)",
       "Bash(sudo journalctl:*)",
       "Bash(chmod:*)",
-      "Bash(ss:*)"
+      "Bash(ss:*)",
+      "Bash(systemctl status:*)",
+      "Bash(systemctl is-active:*)"
     ],
     "deny": [],
     "ask": []

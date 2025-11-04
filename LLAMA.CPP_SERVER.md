@@ -260,19 +260,26 @@ sudo nano /etc/systemd/system/llama-server.service
 
 ```ini
 [Unit]
-Description=llama.cpp - Llama-2-7B
+Description=llama.cpp Server
 After=network.target
 
 [Service]
-Type=simple
+Type=exec
 User=username
 WorkingDirectory=/home/username
 ExecStart=/home/username/wrappers/llama-server-wrapper.sh
+ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- pkill -TERM llama-server
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 Environment="XDG_RUNTIME_DIR=/run/user/1000"
+
+# Process management - ensure all processes in cgroup are killed
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+FinalKillSignal=SIGKILL
 
 [Install]
 WantedBy=multi-user.target
@@ -313,6 +320,31 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   -c 8192
 ```
 
+### Important Notes on Service Configuration
+
+**Why these specific settings?**
+
+When running llama-server inside a distrobox container, standard systemd stop commands may not properly terminate the process. The configuration above includes critical settings to ensure reliable service management:
+
+- **`Type=exec`** - Better process tracking than `Type=simple` for containerized applications
+- **`ExecStop`** - Explicitly sends SIGTERM to llama-server inside the container
+- **`KillMode=mixed`** - Ensures all processes in the cgroup are terminated, not just the wrapper script
+- **`TimeoutStopSec=30`** - Allows 30 seconds for graceful shutdown before forcing termination
+- **`FinalKillSignal=SIGKILL`** - Forces cleanup if graceful shutdown fails
+
+Without these settings, running `sudo systemctl stop llama-server` may leave the llama-server process orphaned inside the container, requiring manual cleanup with `pkill`.
+
+**Testing your service:**
+```bash
+# Test stopping the service
+sudo systemctl stop llama-server
+
+# Verify it actually stopped (should show "inactive")
+systemctl is-active llama-server
+
+# Check for lingering processes (should return nothing)
+ps aux | grep llama-server | grep -v grep
+```
 
 ### Enable and Start Service
 
@@ -649,6 +681,46 @@ ping YOUR_SERVER_IP
 telnet YOUR_SERVER_IP 8080
 ```
 
+#### Issue: "Service won't stop with systemctl stop"
+
+If `sudo systemctl stop llama-server` doesn't actually stop the server:
+
+**Symptom:**
+- Service shows as "inactive" but llama-server process is still running
+- Port 8080 is still occupied after stopping service
+- Need to manually kill the process
+
+**Cause:**
+This happens with older service configurations that don't properly handle signals to containerized processes.
+
+**Solution:**
+Update your service file to include proper signal handling:
+
+```bash
+# Edit your service file
+sudo nano /etc/systemd/system/llama-server.service
+```
+
+Ensure these settings are present:
+```ini
+Type=exec  # Not "simple"
+ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- pkill -TERM llama-server
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+FinalKillSignal=SIGKILL
+```
+
+Then reload and test:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl stop llama-server
+systemctl is-active llama-server  # Should show "inactive"
+ps aux | grep llama-server | grep -v grep  # Should return nothing
+```
+
+See the [Running as a System Service](#running-as-a-system-service) section for the complete updated service configuration.
+
 #### Issue: "Slow response times"
 
 **Check GPU power state:**
@@ -729,11 +801,22 @@ Description=llama.cpp Server - Llama 2 7B
 After=network.target
 
 [Service]
-Type=simple
+Type=exec
 User=username
+WorkingDirectory=/home/username
 ExecStart=/usr/bin/distrobox enter llama-rocm-7rc-rocwmma -- /home/username/llama.cpp/build/bin/llama-server -m /home/username/models/llama-2-7b.Q4_K_M.gguf --host 0.0.0.0 --port 8080 -ngl 99 --no-mmap -c 4096 --parallel 4
+ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- pkill -TERM llama-server
 Restart=on-failure
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+FinalKillSignal=SIGKILL
 
 [Install]
 WantedBy=multi-user.target
@@ -746,11 +829,22 @@ Description=llama.cpp Server - Llama 70B
 After=network.target
 
 [Service]
-Type=simple
+Type=exec
 User=username
+WorkingDirectory=/home/username
 ExecStart=/usr/bin/distrobox enter llama-rocm-7rc-rocwmma -- /home/username/llama.cpp/build/bin/llama-server -m /home/username/models/llama-70b.Q4_K_M.gguf --host 0.0.0.0 --port 8081 -ngl 99 --no-mmap -c 8192 --parallel 2
+ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- pkill -TERM llama-server
 Restart=on-failure
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+FinalKillSignal=SIGKILL
 
 [Install]
 WantedBy=multi-user.target
