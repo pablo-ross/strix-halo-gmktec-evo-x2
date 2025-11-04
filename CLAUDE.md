@@ -250,12 +250,45 @@ rocm-smi
 ls -la /dev/kfd /dev/dri/renderD128  # Should be 0666
 ```
 
+## Systemctl Configuration Files
+
+The `systemctl/` directory contains production-ready systemd service configuration for running llama-server as a system service.
+
+**Files:**
+- `llama-server.service` - Systemd unit file for llama-server service
+- `qwen3-coder-server-bg-v3.sh` - Optimized wrapper script for Qwen3-Coder-30B
+
+**Key features:**
+- Runs llama-server inside distrobox container
+- Automatic restart on failure
+- Proper process management and cleanup
+- Journal logging integration
+- Pre-configured for 128K context window with DeepSeek-style reasoning
+
+**Setup steps:**
+1. Copy wrapper script to a suitable location (e.g., `~/wrappers/`)
+2. Update paths in both files (replace `username` with your actual username)
+3. Make wrapper script executable: `chmod +x ~/wrappers/qwen3-coder-server-bg-v3.sh`
+4. Copy service file to systemd: `sudo cp systemctl/llama-server.service /etc/systemd/system/`
+5. Enable and start: `sudo systemctl enable --now llama-server`
+
+**The wrapper script includes:**
+- Optimized parameters for Strix Halo hardware
+- 128K context window support (-c 131072)
+- DeepSeek-style reasoning mode (--reasoning-format deepseek)
+- Qwen3 official sampling parameters (temp 0.6, top-p 0.95, top-k 20)
+- Parallel request handling (--parallel 2)
+- Comprehensive inline documentation
+
 ## Server Deployment
 
 **Systemd service for llama-server:**
-- Example service file in LLAMA.CPP_SERVER.md
-- Use `distrobox enter` in ExecStart
-- Enable with: `sudo systemctl enable llama-server`
+- Production-ready service file available in `systemctl/llama-server.service`
+- Optimized wrapper script available in `systemctl/qwen3-coder-server-bg-v3.sh`
+- See LLAMA.CPP_SERVER.md for detailed setup guide
+- Enable with: `sudo systemctl enable --now llama-server`
+- Check status: `sudo systemctl status llama-server`
+- View logs: `sudo journalctl -u llama-server -f`
 
 **Firewall configuration:**
 ```bash
