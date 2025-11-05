@@ -1,0 +1,24 @@
+[Unit]
+Description=llama.cpp bielik-11b
+After=network.target
+
+[Service]
+Type=exec
+User=mornel
+WorkingDirectory=/home/mornel
+ExecStart=/home/mornel/wrappers/bielik-11b-server.sh
+ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- pkill -TERM llama-server
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+
+# Process management - ensure all processes in cgroup are killed
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+FinalKillSignal=SIGKILL
+
+[Install]
+WantedBy=multi-user.target
