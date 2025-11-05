@@ -1,6 +1,7 @@
 [Unit]
 Description=llama.cpp qwen3-coder
-After=network.target
+After=network.target user@1000.service
+Requires=user@1000.service
 
 [Service]
 Type=simple
