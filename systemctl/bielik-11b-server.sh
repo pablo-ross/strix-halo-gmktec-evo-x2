@@ -14,7 +14,7 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   /home/username/llama.cpp/build/bin/llama-server \
   \
   `# MODEL CONFIGURATION` \
-  -m /models/Bielik-11B-v2.6-Instruct.Q8_0.gguf \
+  -m /models/Bielik-11B-v2.6-Instruct.Q4_K_M.gguf \
   --alias Bielik-11B-v2.6-Instruct \
   \
   `# NETWORK (Different port from Qwen3)` \
@@ -35,8 +35,8 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   `# KV cache reuse for efficiency` \
   \
   `# PARALLEL PROCESSING (More slots possible with smaller model)` \
-  --parallel 6 \
-  `# 6 slots - 11B model has lower memory footprint` \
+  --parallel 8 \
+  `# 8 slots - Q4_K_M quantization has ~50% smaller memory footprint` \
   -sps 0.5 \
   `# Slot prompt similarity` \
   -cb \
@@ -68,10 +68,10 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
 # - Uses ChatML format (<|im_start|>, <|im_end|>)
 # - Recommended temp=0.2 for focused responses
 # - No moderation mechanisms - can produce biased/incorrect outputs
-# - Q8_0 quantization (~11-12GB) for high quality with better performance
+# - Q4_K_M quantization (~6-7GB) for good quality with excellent performance
 #
 # MEMORY USAGE:
-# - Model: ~11-12GB (Q8_0)
+# - Model: ~6-7GB (Q4_K_M)
 # - Context (64K): ~8GB
-# - Total: ~20GB (plenty of room on 120GB system)
+# - Total: ~15GB (plenty of room on 120GB system)
 # ==============================================================================
