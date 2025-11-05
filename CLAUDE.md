@@ -256,7 +256,7 @@ The `systemctl/` directory contains production-ready systemd service configurati
 
 **Files:**
 - `llama-server.service` - Systemd unit file for llama-server service
-- `qwen3-coder-server-bg-v3.sh` - Optimized wrapper script for Qwen3-Coder-30B
+- `qwen3-coder-server.sh` - Optimized wrapper script for Qwen3-Coder-30B
 
 **Key features:**
 - Runs llama-server inside distrobox container
@@ -268,7 +268,7 @@ The `systemctl/` directory contains production-ready systemd service configurati
 **Setup steps:**
 1. Copy wrapper script to a suitable location (e.g., `~/wrappers/`)
 2. Update paths in both files (replace `username` with your actual username)
-3. Make wrapper script executable: `chmod +x ~/wrappers/qwen3-coder-server-bg-v3.sh`
+3. Make wrapper script executable: `chmod +x ~/wrappers/qwen3-coder-server.sh`
 4. Copy service file to systemd: `sudo cp systemctl/llama-server.service /etc/systemd/system/`
 5. Enable and start: `sudo systemctl enable --now llama-server`
 
@@ -284,7 +284,7 @@ The `systemctl/` directory contains production-ready systemd service configurati
 
 **Systemd service for llama-server:**
 - Production-ready service file available in `systemctl/llama-server.service`
-- Optimized wrapper script available in `systemctl/qwen3-coder-server-bg-v3.sh`
+- Optimized wrapper script available in `systemctl/qwen3-coder-server.sh`
 - See LLAMA.CPP_SERVER.md for detailed setup guide
 - Enable with: `sudo systemctl enable --now llama-server`
 - Check status: `sudo systemctl status llama-server`

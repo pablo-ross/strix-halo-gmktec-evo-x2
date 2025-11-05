@@ -71,7 +71,7 @@
 ## Model Information
 
 **Model:** Qwen3-Coder-30B-A3B-Instruct-Q4_K_M
-- **Source:** /home/mornel/models/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf
+- **Source:** /home/username/models/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf
 - **Model Size:** 18,550,716,416 bytes (17.3 GiB)
 - **Parameters:** 30,532,122,624 (30.5 B)
 - **Quantization:** Q4_K_M (4-bit with K-quant)
@@ -284,8 +284,8 @@ The server is deployed as a systemd service for automatic startup and management
 **Command:**
 ```bash
 distrobox enter llama-rocm-7rc-rocwmma -- \
-  /home/mornel/llama.cpp/build/bin/llama-server \
-  -m /home/mornel/models/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf \
+  /home/username/llama.cpp/build/bin/llama-server \
+  -m /home/username/models/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf \
   --host 0.0.0.0 \
   --port 8080 \
   -ngl 99 \
@@ -393,7 +393,7 @@ curl -s http://localhost:8080/v1/completions \
 
 ### Python Benchmark Script
 
-See `/home/mornel/ubuntu-setup/benchmark_server.sh` for the automated test suite.
+See `/home/username/ubuntu-setup/benchmark_server.sh` for the automated test suite.
 
 **Results saved to:** `/tmp/benchmark_results_clean.json`
 

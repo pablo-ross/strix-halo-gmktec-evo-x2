@@ -34,7 +34,7 @@ Quick reference guide for Claude Code with common commands, troubleshooting step
 ### [systemctl/](systemctl/)
 Production-ready systemd service configuration for running llama-server as a system service:
 - **llama-server.service** - Systemd unit file with automatic restart and proper process management
-- **qwen3-coder-server-bg-v3.sh** - Optimized wrapper script for Qwen3-Coder-30B with 128K context window support, DeepSeek-style reasoning mode, and comprehensive inline documentation
+- **qwen3-coder-server.sh** - Optimized wrapper script for Qwen3-Coder-30B with 128K context window support, DeepSeek-style reasoning mode, and comprehensive inline documentation
 
 ## Quick Start
 
