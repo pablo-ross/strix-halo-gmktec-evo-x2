@@ -224,6 +224,52 @@ generate_nginx_config() {
         log_warn "DEFAULT_MODEL not found, using $name (port $default_port) as default"
     fi
 
+    # Generate internal locations for each backend
+    local internal_locations=""
+    local models=($(compgen -v | grep "^MODEL_[0-9]"))
+    for model_var in "${models[@]}"; do
+        local model_def="${!model_var}"
+        IFS=':' read -r name port patterns <<< "$model_def"
+        internal_locations="${internal_locations}    # Internal location for ${name}\n"
+        internal_locations="${internal_locations}    location /internal/backend_${port}/models {\n"
+        internal_locations="${internal_locations}        internal;\n"
+        internal_locations="${internal_locations}        proxy_pass http://127.0.0.1:${port}/v1/models;\n"
+        internal_locations="${internal_locations}        proxy_http_version 1.1;\n"
+        internal_locations="${internal_locations}    }\n\n"
+    done
+
+    # Generate Lua code to aggregate models from all backends
+    local aggregate_lua="            local cjson = require \"cjson\"
+            local all_models = {}
+
+"
+
+    for model_var in "${models[@]}"; do
+        local model_def="${!model_var}"
+        IFS=':' read -r name port patterns <<< "$model_def"
+        aggregate_lua="${aggregate_lua}            -- Fetch from ${name} (port ${port})
+            local res_${port} = ngx.location.capture(\"/internal/backend_${port}/models\")
+            if res_${port}.status == 200 then
+                local ok, data = pcall(cjson.decode, res_${port}.body)
+                if ok and data.data then
+                    for _, model in ipairs(data.data) do
+                        table.insert(all_models, model)
+                    end
+                end
+            end
+
+"
+    done
+
+    aggregate_lua="${aggregate_lua}            -- Return combined response
+            local response = {
+                object = \"list\",
+                data = all_models
+            }
+            ngx.header.content_type = \"application/json\"
+            ngx.say(cjson.encode(response))
+"
+
     cat > "$NGINX_SITE_PATH" << EOF
 # ==============================================================================
 # LLM API Gateway - Dynamic Model Routing
@@ -244,7 +290,16 @@ server {
     # Increase body size for large prompts
     client_max_body_size ${CLIENT_MAX_BODY_SIZE};
 
-    # Main API endpoint
+    # Aggregate models from all backends
+    location = /v1/models {
+        content_by_lua_block {
+${aggregate_lua}
+        }
+    }
+
+$(echo -e "$internal_locations")
+
+    # Main API endpoint (other routes)
     location /v1/ {
         # Read request body for model field inspection
         lua_need_request_body on;
