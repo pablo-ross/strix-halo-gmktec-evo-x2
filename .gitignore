@@ -13,3 +13,6 @@ __pycache__/
 # Backup files
 *~
 *.bak
+
+# .env files
+.env
