@@ -11,7 +11,7 @@
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
 exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
-  /home/mornel/llama.cpp/build/bin/llama-server \
+  /home/username/llama.cpp/build/bin/llama-server \
   \
   `# MODEL CONFIGURATION` \
   -m /models/Bielik-11B-v2.6-Instruct.Q8_0.gguf \
