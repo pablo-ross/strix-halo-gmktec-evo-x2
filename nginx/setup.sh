@@ -205,6 +205,25 @@ generate_nginx_config() {
     local upstreams=$(generate_upstreams)
     local lua_routing=$(generate_lua_routing)
 
+    # Determine default backend port
+    local default_port=""
+    local models=($(compgen -v | grep "^MODEL_[0-9]"))
+    for model_var in "${models[@]}"; do
+        local model_def="${!model_var}"
+        IFS=':' read -r name port patterns <<< "$model_def"
+        if [ "$name" = "$DEFAULT_MODEL" ]; then
+            default_port="$port"
+            break
+        fi
+    done
+
+    if [ -z "$default_port" ]; then
+        # Use first model as default
+        local first_model="${!models[0]}"
+        IFS=':' read -r name default_port patterns <<< "$first_model"
+        log_warn "DEFAULT_MODEL not found, using $name (port $default_port) as default"
+    fi
+
     cat > "$NGINX_SITE_PATH" << EOF
 # ==============================================================================
 # LLM API Gateway - Dynamic Model Routing
