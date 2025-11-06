@@ -12,13 +12,13 @@ Quick reference guide for your multi-model LLM deployment.
 - Added `sessionTokenLimit`: 258,048 tokens
 - Ready for multi-model setup (docs in `~/.qwen/MULTI_MODEL_SETUP.md`)
 
-✅ **Wrapper Scripts** (`/home/mornel/wrappers/`)
+✅ **Wrapper Scripts** (`/home/username/wrappers/`)
 - `qwen3-coder-server.sh` - Main chat (active on port 8080)
 - `qwen25-7b-autocomplete-server.sh` - Fast autocomplete (port 8082, commented)
 - `nomic-embed-server.sh` - Embeddings (port 8083, commented)
 - `deepseek-r1-reasoning-server.sh` - Reasoning (port 8084, commented)
 
-✅ **Systemd Services** (`/home/mornel/ubuntu-setup/systemctl/`)
+✅ **Systemd Services** (`/home/username/ubuntu-setup/systemctl/`)
 - `qwen25-7b-server.service` - Ready to install
 - `nomic-embed-server.service` - Ready to install
 - `deepseek-r1-server.service` - Ready to install
@@ -204,8 +204,8 @@ qwen-reasoning "complex problem"   # Uses DeepSeek R1 (when enabled)
 | `MULTI_MODEL_DEPLOYMENT.md` | Complete deployment guide |
 | `~/.continue/MULTI_MODEL_SETUP.md` | Continue.dev configuration |
 | `~/.qwen/MULTI_MODEL_SETUP.md` | Qwen Code configuration |
-| `/home/mornel/wrappers/*.sh` | Server startup scripts |
-| `/home/mornel/ubuntu-setup/systemctl/*.service` | Systemd service definitions |
+| `/home/username/wrappers/*.sh` | Server startup scripts |
+| `/home/username/ubuntu-setup/systemctl/*.service` | Systemd service definitions |
 
 ## Need Help?
 

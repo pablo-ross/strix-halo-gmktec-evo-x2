@@ -20,7 +20,7 @@ This setup uses specialized models for different tasks to maximize performance a
 
 1. **Qwen3-Coder-30B** (Main chat)
    - Systemd: `llama-server.service`
-   - Wrapper: `/home/mornel/wrappers/qwen3-coder-server.sh`
+   - Wrapper: `/home/username/wrappers/qwen3-coder-server.sh`
    - Port: 8080
    - Context: 256K tokens
    - Status: ✅ Running
@@ -47,7 +47,8 @@ Only Nomic Embed needs to be downloaded:
 distrobox enter llama-rocm-7rc-rocwmma
 
 # Download Nomic Embed
-export HF_HUB_ENABLE_HF_TRANSFER=1
+exit
+
 hf download nomic-ai/nomic-embed-text-v2-moe-GGUF \
   nomic-embed-text-v2-moe-f16.gguf \
   --local-dir ~/models
@@ -68,10 +69,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=mornel
-Group=mornel
-WorkingDirectory=/home/mornel
-ExecStart=/home/mornel/wrappers/qwen25-7b-autocomplete-server.sh
+User=username
+Group=groupname
+WorkingDirectory=/home/username
+ExecStart=/home/username/wrappers/qwen25-7b-autocomplete-server.sh
 Restart=on-failure
 RestartSec=10s
 StandardOutput=journal
@@ -92,10 +93,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=mornel
-Group=mornel
-WorkingDirectory=/home/mornel
-ExecStart=/home/mornel/wrappers/nomic-embed-server.sh
+User=username
+Group=groupname
+WorkingDirectory=/home/username
+ExecStart=/home/username/wrappers/nomic-embed-server.sh
 Restart=on-failure
 RestartSec=10s
 StandardOutput=journal
@@ -116,10 +117,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=mornel
-Group=mornel
-WorkingDirectory=/home/mornel
-ExecStart=/home/mornel/wrappers/deepseek-r1-reasoning-server.sh
+User=username
+Group=groupname
+WorkingDirectory=/home/username
+ExecStart=/home/username/wrappers/deepseek-r1-reasoning-server.sh
 Restart=no
 StandardOutput=journal
 StandardError=journal
@@ -365,7 +366,7 @@ ss -tlnp | grep :8082
 ls -l ~/wrappers/*.sh
 
 # Test wrapper directly
-/home/mornel/wrappers/qwen25-7b-autocomplete-server.sh
+/home/username/wrappers/qwen25-7b-autocomplete-server.sh
 ```
 
 ### Nginx routing issues
@@ -397,12 +398,12 @@ sudo systemctl stop deepseek-r1-server
 
 | Component | Location |
 |-----------|----------|
-| Wrapper scripts | `/home/mornel/wrappers/` |
+| Wrapper scripts | `/home/username/wrappers/` |
 | Systemd services | `/etc/systemd/system/*-server.service` |
 | Continue config | `~/.continue/config.json` |
 | Qwen config | `~/.qwen/settings.json` |
-| Models | `/home/mornel/models/` (host) → `/models/` (container) |
-| Setup docs | `/home/mornel/ubuntu-setup/` |
+| Models | `/home/username/models/` (host) → `/models/` (container) |
+| Setup docs | `/home/username/ubuntu-setup/` |
 
 ## Quick Reference Commands
 

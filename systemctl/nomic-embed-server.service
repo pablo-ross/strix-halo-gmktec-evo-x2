@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=mornel
-Group=mornel
-WorkingDirectory=/home/mornel
+User=username
+Group=groupname
+WorkingDirectory=/home/username
 Environment="XDG_RUNTIME_DIR=/run/user/1000"
-ExecStart=/home/mornel/wrappers/nomic-embed-server.sh
+ExecStart=/home/username/wrappers/nomic-embed-server.sh
 Restart=on-failure
 RestartSec=10s
 StandardOutput=journal
