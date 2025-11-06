@@ -1,0 +1,22 @@
+[Unit]
+Description=llama.cpp Server - Qwen2.5-Coder-7B (Fast Autocomplete)
+After=network.target
+
+[Service]
+Type=simple
+User=mornel
+Group=mornel
+WorkingDirectory=/home/mornel
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+ExecStart=/home/mornel/wrappers/qwen25-7b-autocomplete-server.sh
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+MemoryMax=12G
+CPUQuota=400%
+
+[Install]
+WantedBy=multi-user.target

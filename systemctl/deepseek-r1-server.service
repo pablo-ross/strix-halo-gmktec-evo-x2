@@ -1,0 +1,21 @@
+[Unit]
+Description=llama.cpp Server - DeepSeek R1 Distill (Reasoning)
+After=network.target
+
+[Service]
+Type=simple
+User=mornel
+Group=mornel
+WorkingDirectory=/home/mornel
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+ExecStart=/home/mornel/wrappers/deepseek-r1-reasoning-server.sh
+Restart=no
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+MemoryMax=30G
+CPUQuota=800%
+
+[Install]
+WantedBy=multi-user.target

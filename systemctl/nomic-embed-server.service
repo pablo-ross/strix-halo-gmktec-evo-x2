@@ -1,0 +1,22 @@
+[Unit]
+Description=llama.cpp Server - Nomic Embed v2 MoE (Embeddings)
+After=network.target
+
+[Service]
+Type=simple
+User=mornel
+Group=mornel
+WorkingDirectory=/home/mornel
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+ExecStart=/home/mornel/wrappers/nomic-embed-server.sh
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+MemoryMax=6G
+CPUQuota=400%
+
+[Install]
+WantedBy=multi-user.target
