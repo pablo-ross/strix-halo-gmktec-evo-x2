@@ -3,7 +3,7 @@
 # Multi-Model LLM Benchmark Suite
 # ==============================================================================
 # Tests all llama-server instances on AMD Strix Halo system
-# Models: Qwen3-Coder-30B, Bielik-11B, Qwen2.5-7B, DeepSeek-R1, Nomic-Embed
+# Models: Qwen3-Coder-30B, Bielik-11B, Qwen2.5-7B, DeepSeek-R1, Nomic-Embed, E5-Large
 #
 # LOCALE SUPPORT:
 # ---------------
@@ -80,6 +80,7 @@ declare -A MODELS=(
   ["qwen25"]="Qwen2.5-Coder-7B:8082:Fast autocomplete (7B):completion"
   ["deepseek"]="DeepSeek-R1-Distill:8084:Reasoning (32B):completion"
   ["nomic"]="Nomic-Embed-v2-MoE:8083:Text embeddings (MoE):embedding"
+  ["e5large"]="E5-Large-v2:8085:Embeddings (335M):embedding"
 )
 
 RESULTS_DIR="/tmp/llm_benchmarks"
@@ -111,11 +112,12 @@ show_menu() {
   echo -e "  ${GREEN}2)${NC} Bielik-11B         (port 8081) - Polish language"
   echo -e "  ${GREEN}3)${NC} Qwen2.5-Coder-7B   (port 8082) - Fast autocomplete"
   echo -e "  ${GREEN}4)${NC} DeepSeek-R1        (port 8084) - Reasoning"
-  echo -e "  ${GREEN}5)${NC} Nomic-Embed-v2     (port 8083) - Text embeddings"
-  echo -e "  ${GREEN}6)${NC} ${MAGENTA}Test ALL models${NC}"
-  echo -e "  ${GREEN}7)${NC} Exit"
+  echo -e "  ${GREEN}5)${NC} Nomic-Embed-v2     (port 8083) - Text embeddings (MoE)"
+  echo -e "  ${GREEN}6)${NC} E5-Large-v2        (port 8085) - Text embeddings (335M)"
+  echo -e "  ${GREEN}7)${NC} ${MAGENTA}Test ALL models${NC}"
+  echo -e "  ${GREEN}8)${NC} Exit"
   echo ""
-  echo -n "Select model to benchmark (1-7): "
+  echo -n "Select model to benchmark (1-8): "
 }
 
 # Check if server is responsive
@@ -186,6 +188,17 @@ polish:Szybki brązowy lis przeskakuje przez leniwego psa. To popularne zdanie t
 technical:Implement a RESTful API endpoint using FastAPI framework with async/await pattern, SQLAlchemy ORM for database operations, Pydantic models for request validation, and JWT authentication middleware.
 EOF
       ;;
+    "e5large")
+      # E5-Large embedding tests - same test suite for comparison
+      cat <<'EOF'
+short:semantic search
+medium:Python function for binary search tree implementation
+large:The quick brown fox jumps over the lazy dog. This is a common pangram used for testing text rendering and typography. It contains every letter of the English alphabet at least once. Software developers often use this phrase when testing fonts, keyboards, and other text-related features.
+code:def calculate_fibonacci(n: int) -> int:\n    if n <= 1:\n        return n\n    return calculate_fibonacci(n-1) + calculate_fibonacci(n-2)
+polish:Szybki brązowy lis przeskakuje przez leniwego psa. To popularne zdanie testowe zawierające wiele polskich znaków diakrytycznych.
+technical:Implement a RESTful API endpoint using FastAPI framework with async/await pattern, SQLAlchemy ORM for database operations, Pydantic models for request validation, and JWT authentication middleware.
+EOF
+      ;;
   esac
 }
 
@@ -233,9 +246,7 @@ benchmark_embedding_model() {
       local start=$(date +%s.%N)
       local response=$(curl -s --max-time 30 "$server_url" \
         -H "Content-Type: application/json" \
-        -d "{
-          \"input\": \"$input_text\"
-        }" 2>/dev/null)
+        -d "$(jq -n --arg input "$input_text" '{input: $input}')" 2>/dev/null)
       local end=$(date +%s.%N)
 
       # Check if request was successful
@@ -326,12 +337,7 @@ benchmark_model() {
       local start=$(date +%s.%N)
       local response=$(curl -s --max-time 120 "$server_url" \
         -H "Content-Type: application/json" \
-        -d "{
-          \"prompt\": \"$prompt\",
-          \"max_tokens\": 128,
-          \"temperature\": 0.7,
-          \"stream\": false
-        }" 2>/dev/null)
+        -d "$(jq -n --arg prompt "$prompt" '{prompt: $prompt, max_tokens: 128, temperature: 0.7, stream: false}')" 2>/dev/null)
       local end=$(date +%s.%N)
 
       # Check if request was successful
@@ -442,12 +448,12 @@ main() {
   # Parse command line arguments
   if [ $# -gt 0 ]; then
     case $1 in
-      qwen3|bielik|qwen25|deepseek|nomic)
+      qwen3|bielik|qwen25|deepseek|nomic|e5large)
         benchmark_model "$1"
         exit 0
         ;;
       all)
-        for model in qwen3 bielik qwen25 deepseek nomic; do
+        for model in qwen3 bielik qwen25 deepseek nomic e5large; do
           benchmark_model "$model" || true
           echo ""
         done
@@ -457,9 +463,10 @@ main() {
         echo "Usage: $0 [model|all]"
         echo ""
         echo "Text Generation Models: qwen3, bielik, qwen25, deepseek"
-        echo "Embedding Models: nomic"
+        echo "Embedding Models: nomic, e5large"
         echo "Example: $0 qwen3"
         echo "Example: $0 nomic"
+        echo "Example: $0 e5large"
         echo "Example: $0 all"
         exit 0
         ;;
@@ -482,21 +489,22 @@ main() {
       3) benchmark_model "qwen25" ;;
       4) benchmark_model "deepseek" ;;
       5) benchmark_model "nomic" ;;
-      6)
+      6) benchmark_model "e5large" ;;
+      7)
         echo ""
         echo -e "${MAGENTA}Running benchmarks for ALL models...${NC}"
-        for model in qwen3 bielik qwen25 deepseek nomic; do
+        for model in qwen3 bielik qwen25 deepseek nomic e5large; do
           benchmark_model "$model" || true
           echo ""
         done
         ;;
-      7)
+      8)
         echo ""
         echo -e "${GREEN}Exiting...${NC}"
         exit 0
         ;;
       *)
-        echo -e "${RED}Invalid choice. Please select 1-7.${NC}"
+        echo -e "${RED}Invalid choice. Please select 1-8.${NC}"
         ;;
     esac
 
