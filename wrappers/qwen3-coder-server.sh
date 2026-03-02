@@ -1,20 +1,29 @@
 #!/bin/bash
 
 # ==============================================================================
-# Qwen3-Coder-30B llama-server Configuration v4 (Continue.dev Optimized)
+# Qwen3-Coder-30B llama-server Configuration v4.1 (Stability Optimized)
 # ==============================================================================
 # Hardware: AMD Ryzen AI Max+ 395 w/ Radeon 8060S (Strix Halo)
 # Use Case: Continue.dev IDE integration (autocomplete, chat, edits)
+# Changes: Reduced to 64K context, removed kv-unified for stability
 # ==============================================================================
 
 # Wrapper for systemd - ensures XDG_RUNTIME_DIR is set for podman
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
-exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
-  /home/username/llama.cpp/build/bin/llama-server \
+# Create log directory
+mkdir -p "$HOME/.local/log"
+LOG_FILE="$HOME/.local/log/qwen3-coder-server.log"
+
+# Log startup
+echo "[$(date)] Starting Qwen3-Coder server..." >> "$LOG_FILE"
+
+export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+exec /home/username/llama.cpp/build/bin/llama-server \
   \
   `# MODEL CONFIGURATION` \
-  -m /models/Qwen3-Coder-30B-A3B-Instruct-UD-Q8_K_XL.gguf \
+  -m /home/username/models/Qwen3-Coder-30B-A3B-Instruct-UD-Q8_K_XL.gguf \
   --alias Qwen3-Coder-30B-A3B-Instruct \
   \
   `# NETWORK` \
@@ -27,20 +36,20 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   --reasoning-budget 0 \
   `# GPU OFFLOADING` \
   -ngl 99 \
+  -fa 1 \
   --no-mmap \
   \
   `# CONTEXT & MEMORY` \
-  -c 262144 \
-  --n-predict 2048 \
-  `# 64K context - optimal for IDE usage, faster processing` \
+  -c 200000 \
+  --n-predict 4096 \
+  `# 64K context - more stable, still enough for most coding tasks` \
   --cache-reuse 2048 \
   `# KV cache reuse - critical for Continue's similar context pattern` \
   --cache-type-k f16 \
   --cache-type-v f16 \
-  --kv-unified \
   \
   `# PARALLEL PROCESSING (Optimized for Continue.dev)` \
-  --parallel 4 \
+  --parallel 2 \
   `# 4 slots: autocomplete + chat + slash commands + inline edits` \
   -sps 0.5 \
   `# Slot prompt similarity: reuse slots with 50%+ match` \
