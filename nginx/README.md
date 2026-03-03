@@ -157,7 +157,7 @@ response = client.chat.completions.create(
 
 # Route to Bielik (port 8081)
 response = client.chat.completions.create(
-    model="Bielik-11B-v2.6-Instruct",
+    model="Bielik-11B-v3.0-Instruct",
     messages=[{"role": "user", "content": "Cześć"}]
 )
 ```
@@ -176,7 +176,7 @@ response = client.chat.completions.create(
     {
       "title": "Bielik 11B",
       "provider": "openai",
-      "model": "Bielik-11B-v2.6-Instruct",
+      "model": "Bielik-11B-v3.0-Instruct",
       "apiBase": "http://10.0.0.60/v1"
     }
   ]
@@ -198,7 +198,7 @@ curl http://10.0.0.60/v1/chat/completions \
 curl http://10.0.0.60/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "Bielik-11B-v2.6-Instruct",
+    "model": "Bielik-11B-v3.0-Instruct",
     "messages": [{"role": "user", "content": "Napisz funkcję w Pythonie"}]
   }'
 ```

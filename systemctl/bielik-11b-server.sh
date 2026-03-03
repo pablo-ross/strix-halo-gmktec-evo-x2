@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# Bielik-11B-v2.6-Instruct llama-server Configuration
+# Bielik-11B-v3.0-Instruct llama-server Configuration
 # ==============================================================================
 # Hardware: AMD Ryzen AI Max+ 395 w/ Radeon 8060S (Strix Halo)
 # Model: Polish language model by SpeakLeash
@@ -14,8 +14,8 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   /home/username/llama.cpp/build/bin/llama-server \
   \
   `# MODEL CONFIGURATION` \
-  -m /models/Bielik-11B-v2.6-Instruct.Q4_K_M.gguf \
-  --alias Bielik-11B-v2.6-Instruct \
+  -m /models/Bielik-11B-v3.0-Instruct.Q8_0.gguf \
+  --alias Bielik-11B-v3.0-Instruct \
   \
   `# NETWORK (Different port from Qwen3)` \
   --host 0.0.0.0 \
@@ -35,8 +35,8 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   `# KV cache reuse for efficiency` \
   \
   `# PARALLEL PROCESSING (More slots possible with smaller model)` \
-  --parallel 8 \
-  `# 8 slots - Q4_K_M quantization has ~50% smaller memory footprint` \
+  --parallel 4 \
+  `# 4 slots - Q8_0 quantization uses ~2x memory vs Q4_K_M` \
   -sps 0.5 \
   `# Slot prompt similarity` \
   -cb \
@@ -68,10 +68,10 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
 # - Uses ChatML format (<|im_start|>, <|im_end|>)
 # - Recommended temp=0.2 for focused responses
 # - No moderation mechanisms - can produce biased/incorrect outputs
-# - Q4_K_M quantization (~6-7GB) for good quality with excellent performance
+# - Q8_0 quantization (~11GB) for near-lossless quality
 #
 # MEMORY USAGE:
-# - Model: ~6-7GB (Q4_K_M)
+# - Model: ~11GB (Q8_0)
 # - Context (64K): ~8GB
-# - Total: ~15GB (plenty of room on 120GB system)
+# - Total: ~19GB (plenty of room on 120GB system)
 # ==============================================================================

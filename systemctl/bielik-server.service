@@ -1,5 +1,5 @@
 [Unit]
-Description=llama.cpp bielik-11b
+Description=llama.cpp bielik-11b-v3.0
 After=network.target user@1000.service llama-server.service
 Requires=user@1000.service
 
