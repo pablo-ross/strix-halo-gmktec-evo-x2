@@ -1,5 +1,5 @@
 [Unit]
-Description=llama.cpp Server - E5-Large-v2 (Embeddings)
+Description=llama.cpp Server - gpt-oss-20b
 After=network.target user@1000.service
 Requires=user@1000.service
 
@@ -9,8 +9,8 @@ User=mornel
 Group=mornel
 WorkingDirectory=/home/mornel
 Environment="XDG_RUNTIME_DIR=/run/user/1000"
-ExecStart=/home/mornel/wrappers/e5-large-server.sh
-ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- /bin/bash -c "/usr/sbin/lsof -ti:8085 | xargs -r kill -TERM"
+ExecStart=/home/mornel/wrappers/gpt-oss-20b-server.sh
+ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- /bin/bash -c "/usr/sbin/lsof -ti:8086 | xargs -r kill -TERM"
 Restart=on-failure
 RestartSec=10s
 StandardOutput=journal
@@ -18,8 +18,8 @@ StandardError=journal
 TimeoutStopSec=10
 
 # Resource limits
-MemoryMax=4G
-CPUQuota=400%
+#MemoryMax=12G
+#CPUQuota=400%
 
 [Install]
 WantedBy=multi-user.target

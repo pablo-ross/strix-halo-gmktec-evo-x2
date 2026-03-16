@@ -5,15 +5,16 @@ Requires=user@1000.service
 
 [Service]
 Type=simple
-User=username
-WorkingDirectory=/home/username
-ExecStart=/home/username/wrappers/qwen3-coder-server.sh
-ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- /bin/bash -c "/usr/sbin/lsof -ti:8080 | xargs -r kill -TERM"
+User=mornel
+WorkingDirectory=/home/mornel
+ExecStart=/home/mornel/wrappers/qwen3-coder-server.sh
+ExecStop=/bin/bash -c "lsof -ti:8080 | xargs -r kill -TERM"
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 Environment="XDG_RUNTIME_DIR=/run/user/1000"
+LimitMEMLOCK=infinity
 
 # Give it time to stop gracefully
 TimeoutStopSec=10

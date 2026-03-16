@@ -13,68 +13,67 @@ export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
 # Create log directory
 mkdir -p "$HOME/.local/log"
-LOG_FILE="$HOME/.local/log/qwen3-coder-server.log"
+LOG_FILE="$HOME/.local/log/gpt-oss-20b.log"
 
 # Log startup
-echo "[$(date)] Starting Qwen3-Coder server..." >> "$LOG_FILE"
-
-export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-
-exec /home/mornel/llama.cpp/build/bin/llama-server \
+echo "[$(date)] Starting GPT-OSS-20B server..." >> "$LOG_FILE"
+exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
+  /home/mornel/llama.cpp/build/bin/llama-server \
   \
   `# MODEL CONFIGURATION` \
-  -m /home/mornel/models/Qwen3-Coder-30B-A3B-Instruct-UD-Q8_K_XL.gguf \
-  --alias Qwen3-Coder-30B-A3B-Instruct \
+  -m /models/gpt-oss-20b-F16.gguf \
+  --alias gpt-oss-20b \
   \
   `# NETWORK` \
   --host 0.0.0.0 \
-  --port 8080 \
+  --port 8086 \
   \
   `# TEMPLATE & REASONING` \
   --jinja \
   --reasoning-format none \
   --reasoning-budget 0 \
+  \
   `# GPU OFFLOADING` \
   -ngl 99 \
-  -fa 1 \
   --no-mmap \
   \
   `# CONTEXT & MEMORY` \
-  -c 200000 \
+  -c 32768 \
+  `# GPT-OSS native: 32K context window` \
   --n-predict 4096 \
-  `# 64K context - more stable, still enough for most coding tasks` \
   --cache-reuse 2048 \
-  `# KV cache reuse - critical for Continue's similar context pattern` \
   --cache-type-k f16 \
   --cache-type-v f16 \
   \
-  `# PARALLEL PROCESSING (Optimized for Continue.dev)` \
-  --parallel 2 \
-  `# 4 slots: autocomplete + chat + slash commands + inline edits` \
+  `# PARALLEL PROCESSING` \
+  --parallel 4 \
+  `# 4 slots for Continue.dev workflows` \
   -sps 0.5 \
-  `# Slot prompt similarity: reuse slots with 50%+ match` \
   -cb \
-  `# Continuous batching` \
   -b 2048 \
-  `# Batch size: better for smaller, frequent requests` \
   -ub 512 \
   \
-  `# CPU THREADING (Optimized for Continue.dev)` \
+  `# CPU THREADING` \
   -t 16 \
-  `# 8 threads - lower overhead for frequent small prompts` \
   -tb 16 \
   \
-  `# SAMPLING PARAMETERS (Qwen3 Official)` \
-  --temp 0.6 \
-  --top-p 0.95 \
-  --top-k 20 \
-  --min-p 0.01 \
-  --repeat-penalty 1.05 \
+  `# SAMPLING PARAMETERS (GPT-OSS optimized)` \
+  --temp 0.7 \
+  `# Slightly higher - GPT-OSS benefits from it` \
+  --top-p 0.9 \
+  `# Lower top-p for more focused outputs` \
+  --top-k 40 \
+  `# Standard for general models` \
+  --min-p 0.05 \
+  `# Higher min-p to filter low-prob tokens` \
+  --repeat-penalty 1.1 \
+  `# Slightly stronger penalty` \
   \
   `# SERVER OPTIONS` \
   --metrics \
   --no-webui \
   --no-warmup \
+  \
   `# ROCM OPTIONS` \
   --gpu-layers 99
 

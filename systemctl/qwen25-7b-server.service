@@ -5,11 +5,11 @@ Requires=user@1000.service
 
 [Service]
 Type=simple
-User=username
-Group=groupname
-WorkingDirectory=/home/username
+User=mornel
+Group=mornel
+WorkingDirectory=/home/mornel
 Environment="XDG_RUNTIME_DIR=/run/user/1000"
-ExecStart=/home/username/wrappers/qwen25-7b-autocomplete-server.sh
+ExecStart=/home/mornel/wrappers/qwen25-7b-autocomplete-server.sh
 ExecStop=/usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- /bin/bash -c "/usr/sbin/lsof -ti:8082 | xargs -r kill -TERM"
 Restart=on-failure
 RestartSec=10s
@@ -18,8 +18,8 @@ StandardError=journal
 TimeoutStopSec=10
 
 # Resource limits
-MemoryMax=12G
-CPUQuota=400%
+#MemoryMax=12G
+#CPUQuota=400%
 
 [Install]
 WantedBy=multi-user.target

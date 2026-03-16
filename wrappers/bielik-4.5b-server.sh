@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# Bielik-11B-v3.0-Instruct llama-server Configuration
+# Bielik-11B-v2.6-Instruct llama-server Configuration
 # ==============================================================================
 # Hardware: AMD Ryzen AI Max+ 395 w/ Radeon 8060S (Strix Halo)
 # Model: Polish language model by SpeakLeash
@@ -10,12 +10,17 @@
 # Wrapper for systemd - ensures XDG_RUNTIME_DIR is set for podman
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
-exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
-  /home/username/llama.cpp/build/bin/llama-server \
+# Create log directory
+mkdir -p "$HOME/.local/log"
+LOG_FILE="$HOME/.local/log/Bielik-4.5B-v3.0-Instruct.log"
+
+export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+exec /home/mornel/llama.cpp/build/bin/llama-server \
   \
   `# MODEL CONFIGURATION` \
-  -m /models/Bielik-11B-v3.0-Instruct.Q8_0.gguf \
-  --alias Bielik-11B-v3.0-Instruct \
+  -m /home/mornel/models/Bielik-4.5B-v3.0-Instruct-fp16.gguf \
+  --alias Bielik-4.5B-v3.0-Instruct \
   \
   `# NETWORK (Different port from Qwen3)` \
   --host 0.0.0.0 \
@@ -26,6 +31,7 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   \
   `# GPU OFFLOADING` \
   -ngl 99 \
+  -fa 1 \
   --no-mmap \
   \
   `# CONTEXT & MEMORY (Larger context possible with smaller model)` \
@@ -35,8 +41,8 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
   `# KV cache reuse for efficiency` \
   \
   `# PARALLEL PROCESSING (More slots possible with smaller model)` \
-  --parallel 4 \
-  `# 4 slots - Q8_0 quantization uses ~2x memory vs Q4_K_M` \
+  --parallel 8 \
+  `# 8 slots - Q4_K_M quantization has ~50% smaller memory footprint` \
   -sps 0.5 \
   `# Slot prompt similarity` \
   -cb \
@@ -68,10 +74,10 @@ exec /usr/local/bin/distrobox enter llama-rocm-7rc-rocwmma -- \
 # - Uses ChatML format (<|im_start|>, <|im_end|>)
 # - Recommended temp=0.2 for focused responses
 # - No moderation mechanisms - can produce biased/incorrect outputs
-# - Q8_0 quantization (~11GB) for near-lossless quality
+# - Q4_K_M quantization (~6-7GB) for good quality with excellent performance
 #
 # MEMORY USAGE:
-# - Model: ~11GB (Q8_0)
+# - Model: ~6-7GB (Q4_K_M)
 # - Context (64K): ~8GB
-# - Total: ~19GB (plenty of room on 120GB system)
+# - Total: ~15GB (plenty of room on 120GB system)
 # ==============================================================================
