@@ -82,7 +82,7 @@ distrobox rm llama-rocm-7rc-rocwmma
 distrobox create llama-rocm-6.4.4-rocwmma \
   --image docker.io/kyuz0/amd-strix-halo-toolboxes:rocm-6.4.4-rocwmma \
   --additional-flags "--device /dev/dri --device /dev/kfd \
-    --group-add video --group-add render --group-add sudo \
+    --group-add video --group-add render --group-add wheel \
     --security-opt seccomp=unconfined"
 
 # Rebuild llama.cpp inside container

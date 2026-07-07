@@ -55,7 +55,7 @@ The `renderD[0-9]*` rule is critical - without it, ROCm will fail with `HSA_STAT
 ```bash
 distrobox create llama-rocm-7rc-rocwmma \
   --image docker.io/kyuz0/amd-strix-halo-toolboxes:rocm-7rc-rocwmma \
-  --additional-flags "--device /dev/dri --device /dev/kfd --group-add video --group-add render --group-add sudo --security-opt seccomp=unconfined"
+  --additional-flags "--device /dev/dri --device /dev/kfd --group-add video --group-add render --group-add wheel --security-opt seccomp=unconfined"
 ```
 
 **Enter container:**

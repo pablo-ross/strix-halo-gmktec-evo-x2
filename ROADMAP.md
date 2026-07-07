@@ -198,7 +198,7 @@ distrobox --version   # Should show 1.8.2.0 or later
 ```bash
 distrobox create llama-rocm-7rc-rocwmma \
   --image docker.io/kyuz0/amd-strix-halo-toolboxes:rocm-7rc-rocwmma \
-  --additional-flags "--device /dev/dri --device /dev/kfd --group-add video --group-add render --group-add sudo --security-opt seccomp=unconfined"
+  --additional-flags "--device /dev/dri --device /dev/kfd --group-add video --group-add render --group-add wheel --security-opt seccomp=unconfined"
 ```
 
 **NOTE:** The command syntax differs from `toolbox`:
@@ -298,6 +298,18 @@ cmake --build build --config Release -j$(nproc)
 ```
 
 **NOTE:** The build process will take several minutes. You'll see compilation progress for GPU kernels and CPU code.
+
+**NOTE on reproducibility:** llama.cpp is a fast-moving upstream project and HIP/rocWMMA support for gfx1151 has occasionally regressed between commits. This roadmap has been validated against commit `1f5accb8d` ("Fix garbled output with REPACK at high thread counts (#16956)", see `INITIAL_BENCHMARK.md`). If `git clone` (which tracks the latest commit on `master`) gives you build or runtime errors, try checking out that commit as a known-good baseline:
+```bash
+git checkout 1f5accb8d
+```
+Then re-run the `cmake -B build -S ...` and `cmake --build ...` commands above.
+
+**If the build fails partway through with "corrupted file" or similar object-file errors** (commonly reported around 30-40% progress): this is almost always the OOM killer terminating a compiler process mid-write, not actual corruption. HIP/rocWMMA compilation units are memory-hungry, and `-j$(nproc)` (32 threads on this CPU) can exceed available RAM when many run concurrently. Reduce parallelism and retry, e.g.:
+```bash
+cmake --build build --config Release -j8
+```
+Lower the number further (e.g. `-j4`) if it still fails, and check `dmesg | grep -i "killed process"` to confirm an OOM kill occurred.
 
 **Step 9.2: Install Build**
 ```bash
@@ -425,6 +437,7 @@ cd ~/strix-tools
 - **`cmake: command not found`**: The ROCm container doesn't include build tools. Install them with `sudo dnf install -y cmake gcc-c++ git libcurl-devel` (see Step 9.0)
 - **`Could NOT find CURL` error during cmake**: Install libcurl-devel with `sudo dnf install -y libcurl-devel`
 - **Container uses `dnf` not `apt`**: The ROCm container is Fedora-based. Use `dnf` for package management, not `apt`
+- **Build fails partway (e.g. ~30-40%) with "corrupted file" errors**: Usually an OOM kill during parallel compilation, not real corruption. Retry with lower parallelism, e.g. `cmake --build build --config Release -j8`, and confirm with `dmesg | grep -i "killed process"`. If errors persist, try the known-good commit `1f5accb8d` (see Step 9.1) since upstream HIP/rocWMMA support for gfx1151 has regressed between commits before
 
 ### llama.cpp Runtime Issues
 
