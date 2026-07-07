@@ -5,9 +5,11 @@ Based on your research, here's the step-by-step roadmap optimized for ROCm 7 RC 
 ## Phase 1: BIOS Configuration (BEFORE OS Installation)
 
 **Step 1.1: Configure GPU Memory**
-- Set GART (Graphics Aperture Remapping Table) to **512MB minimum**
-- Navigate to: Integrated Graphics → UMA Frame Buffer Size → 512MB
+- Set GART (Graphics Aperture Remapping Table) / UMA Frame Buffer Size as **low as your BIOS allows** (512MB on some boards/BIOS versions)
+- Navigate to: Integrated Graphics → UMA Frame Buffer Size → lowest available value
 - If available: Device Manager → AMD CBS → NBIO Common Options → GFX Configuration → Set as needed
+
+**NOTE:** This BIOS setting only reserves a small, fixed dedicated VRAM framebuffer — it is unrelated to the ~120GB of GTT (unified compute memory) that this roadmap configures later via kernel/modprobe parameters (Phase 3). Some BIOS versions (e.g. EVO-X2 1.12) only expose 2GB as the minimum under `UMA_SPECIFIED`/`AUTO` instead of 512MB. **This is fine** — just pick the lowest value offered (2GB is not a blocker) and continue with the roadmap. It only means ~1.5GB less GTT headroom, which is negligible on a 124GB system.
 
 **Step 1.2: Disable IOMMU**
 - Find IOMMU setting in BIOS
