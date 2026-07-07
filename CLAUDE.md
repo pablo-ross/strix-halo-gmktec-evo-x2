@@ -22,7 +22,9 @@ This repository contains setup guides and configuration documentation for optimi
 
 **Kernel Requirements:**
 - Minimum: Linux 6.16.9 (critical for >15GB VRAM access)
-- Current: 6.16.9-061609-generic
+- Current: 6.17.0-1028-oem
+
+**Note:** Kernel 6.17 broke the KFD kernel/userspace ABI against the ROCm 7.0-rc HSA runtime used by the old distrobox container below, causing `llama-server` to segfault in `libhsa-runtime64.so` (see `LLAMA_ISSUES_SUMMARY.md`). The fix was to move off distrobox and run ROCm 7.2 + llama.cpp natively on the host (see "Building and Running llama.cpp" below), which matches the host kernel's KFD ABI.
 
 **Essential Kernel Parameters:**
 ```
@@ -44,7 +46,7 @@ SUBSYSTEM=="drm", KERNEL=="renderD[0-9]*", GROUP="render", MODE="0666", OPTIONS+
 ```
 The `renderD[0-9]*` rule is critical - without it, ROCm will fail with `HSA_STATUS_ERROR_OUT_OF_RESOURCES`.
 
-### Container Environment
+### Container Environment (legacy / initial setup path)
 
 **Tool:** Distrobox (not toolbox - Ubuntu 24.04 doesn't include toolbox)
 - Container: `docker.io/kyuz0/amd-strix-halo-toolboxes:rocm-7rc-rocwmma`
@@ -63,39 +65,64 @@ distrobox create llama-rocm-7rc-rocwmma \
 distrobox enter llama-rocm-7rc-rocwmma
 ```
 
-### Building llama.cpp
+**Note:** This container-based path is what the ROADMAP.md initial setup walkthrough uses, and still works for getting a first build running. However, the live system on this hardware has since moved off it (see "Native Host Build" below) because kernel 6.17 broke ABI compatibility with the container's bundled ROCm 7.0-rc runtime. If you hit `HSA_STATUS_ERROR_INVALID_PACKET_FORMAT` or similar HSA queue errors inside the container while the host works fine, this ABI mismatch is the likely cause — switch to the native host build.
 
-**Location:** Inside the ROCm container at `~/llama.cpp`
+### Building and Running llama.cpp (current production setup: native host, ROCm 7.2)
 
-**Build dependencies (install in container first):**
+**Why native instead of distrobox:** ROCm 7.2 is installed directly on the host so the HSA runtime always matches the host kernel's KFD driver, avoiding the ABI-mismatch class of crash described above. See `LLAMA_ISSUES_SUMMARY.md` for the full incident writeup.
+
+**Install ROCm 7.2 on host:**
 ```bash
-sudo dnf install -y cmake gcc-c++ git libcurl-devel python3-pip
+# /etc/apt/sources.list.d/rocm.list should point at rocm/apt/7.2
+sudo apt install rocm-hip-runtime-dev hipblas-dev
+# Installs to /opt/rocm-7.2.0
+```
+
+**Location:** `~/llama.cpp` (native checkout, not inside a container)
+
+**Build dependencies:**
+```bash
+sudo apt install -y cmake g++ git libcurl4-openssl-dev
 ```
 
 **Build command:**
 ```bash
-cmake -B build -S . \
+CC=/usr/bin/gcc CXX=/usr/bin/g++ cmake -S . -B build \
   -DGGML_HIP=ON \
-  -DAMDGPU_TARGETS="gfx1151" \
-  -DGGML_HIP_ROCWMMA_FATTN=ON \
-  -DGGML_HIP_MMQ_MFMA=ON
+  -DCMAKE_HIP_FLAGS="--rocm-path=/opt/rocm-7.2.0 -mllvm --amdgpu-unroll-threshold-local=600" \
+  -DAMDGPU_TARGETS=gfx1151 \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DGGML_RPC=ON \
+  -DROCM_PATH=/opt/rocm-7.2.0 \
+  -DHIP_PLATFORM=amd
 
 cmake --build build --config Release -j$(nproc)
 ```
 
+Key flags:
+- `-mllvm --amdgpu-unroll-threshold-local=600` — performance regression workaround needed on ROCm 7+
+- `-DAMDGPU_TARGETS=gfx1151` — Strix Halo (Radeon 8060S) target
+- `LLAMA_HIP_UMA` is obsolete; UMA is auto-detected at runtime for integrated GPUs
+
 **Binaries location:** `build/bin/`
+
+**Running:** set `LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"` before invoking `llama-server`/`llama-cli` (see `wrappers/*.sh` for real examples), and always pass `-fa 1` (flash attention) and `--no-mmap` — both are required on Strix Halo to avoid crashes/slowdowns.
 
 ### Running Inference
 
 **Critical flags for this hardware:**
 - `--no-mmap` (llama-cli) or `-mmp 0` (llama-bench): Required for GPU backends
 - `-ngl 99` (or 999): Offload all layers to GPU
+- `-fa 1`: Flash attention — required on Strix Halo, prevents crashes (added after the ROCm 7.2 migration; see `LLAMA_ISSUES_SUMMARY.md`)
+- When running natively on the host (not distrobox), first: `export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"`
 
 **CLI inference:**
 ```bash
+export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
 ./build/bin/llama-cli \
   -m ~/models/model.gguf \
   --no-mmap \
+  -fa 1 \
   -ngl 99 \
   -p "prompt" \
   -n 128
@@ -103,9 +130,11 @@ cmake --build build --config Release -j$(nproc)
 
 **Benchmark:**
 ```bash
+export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
 ./build/bin/llama-bench \
   -m ~/models/model.gguf \
   -mmp 0 \
+  -fa 1 \
   -ngl 99 \
   -p 512 \
   -n 128
@@ -113,18 +142,22 @@ cmake --build build --config Release -j$(nproc)
 
 **Server mode:**
 ```bash
+export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
 ./build/bin/llama-server \
   -m ~/models/model.gguf \
   --host 0.0.0.0 \
   --port 8080 \
   -ngl 99 \
+  -fa 1 \
   --no-mmap \
   -c 4096
 ```
 
+See `wrappers/*.sh` for the actual production wrapper scripts used by the systemd services in this repo, which follow this same pattern per-model.
+
 ### Model Management
 
-**Storage location:** `~/models` (outside containers to persist across updates)
+**Storage location:** `~/models` (persists across container/build updates)
 
 **Downloading models:**
 ```bash
@@ -168,12 +201,16 @@ hf download TheBloke/Llama-2-7B-GGUF llama-2-7b.Q4_K_M.gguf --local-dir ~/models
 - Fix: Add `renderD[0-9]*` rule to `/etc/udev/rules.d/99-amd-kfd.rules`
 - Reload: `sudo udevadm control --reload-rules && sudo udevadm trigger`
 
-**Container can't access GPU:**
+**Container can't access GPU (legacy distrobox path):**
 - Check permissions: `ls -la /dev/kfd /dev/dri/`
 - All should be `0666` (crw-rw-rw-)
 - Verify user in groups: `video` and `render`
 
-### Build Issues in Container
+**`HSA_STATUS_ERROR_INVALID_PACKET_FORMAT` / malformed AQL packet inside distrobox, but works on host:**
+- KFD kernel/userspace ABI mismatch between host kernel and the container's bundled ROCm HSA runtime
+- Fix: don't debug the container — switch to the native host build (see "Building and Running llama.cpp" above), which is the current production setup
+
+### Build Issues in Container (legacy distrobox path)
 
 **`cmake: command not found`:**
 - Container doesn't include build tools by default
@@ -219,11 +256,12 @@ hf download TheBloke/Llama-2-7B-GGUF llama-2-7b.Q4_K_M.gguf --local-dir ~/models
 
 1. **Always use `--no-mmap`** with llama-cli on GPU backends
 2. **Always use `-ngl 99`** to offload all layers to GPU
-3. **Store models in ~/models** (outside containers)
-4. **Never use Ollama** - lacks proper Vulkan/AMD support
-5. **Kernel 6.16.9+ is critical** for >15GB VRAM access
-6. **Set `ROCBLAS_USE_HIPBLASLT=1`** (already set in kyuz0 containers)
-7. **Optimal batch size is 512** for this hardware
+3. **Always use `-fa 1`** (flash attention) on Strix Halo to avoid crashes
+4. **Store models in ~/models** (persists across builds/container updates)
+5. **Never use Ollama** - lacks proper Vulkan/AMD support
+6. **Kernel 6.16.9+ is critical** for >15GB VRAM access; kernel 6.17+ requires ROCm 7.2 (native host build) rather than the older ROCm 7.0-rc distrobox container, due to a KFD ABI break (see `LLAMA_ISSUES_SUMMARY.md`)
+7. **`ROCBLAS_USE_HIPBLASLT=1`** was set by default in the kyuz0 distrobox containers; not currently exported anywhere in the native host setup (`wrappers/*.sh`), so don't assume it's set if running natively
+8. **Optimal batch size is 512** for this hardware
 
 ## Verification Commands
 
@@ -239,7 +277,7 @@ for file in /sys/class/drm/card*/device/mem_info*; do
 done
 ```
 
-**Check ROCm visibility (in container):**
+**Check ROCm visibility:**
 ```bash
 rocminfo | grep -A100 'Agent 2' | grep -A50 'Pool Info'
 rocm-smi
@@ -252,43 +290,37 @@ ls -la /dev/kfd /dev/dri/renderD128  # Should be 0666
 
 ## Systemctl Configuration Files
 
-The `systemctl/` directory contains production-ready systemd service configuration for running llama-server as a system service.
+The `systemctl/` directory contains production-ready systemd unit files, one per model currently served; `wrappers/` holds the matching launch scripts. Each wrapper execs `llama-server` natively (ROCm 7.2, see above) with model-specific flags on its own port.
 
-**Files:**
-- `llama-server.service` - Systemd unit file for llama-server service
-- `qwen3-coder-server.sh` - Optimized wrapper script for Qwen3-Coder-30B
+**Current services (`systemctl/*.service` + `wrappers/*.sh`):**
+- `llama-server.service` / `qwen3-coder-server.sh` - Qwen3-Coder-30B, port 8080, Continue.dev coding use
+- `bielik-server.service` / `bielik-11b-server.sh`, `bielik-4.5b-server.sh` - Polish-language Bielik models, port 8081
+- `deepseek-r1-server.service` / `deepseek-r1-reasoning-server.sh` - DeepSeek-R1 reasoning model
+- `gpt-oss-server.service` / `gpt-oss-20b-server.sh` - GPT-OSS-20B
+- `qwen25-7b-server.service` / `qwen25-7b-autocomplete-server.sh` - Qwen2.5-7B autocomplete
+- `e5-large-server.service` / `e5-large-server.sh` - E5-Large-v2 embedding model
+- `nomic-embed-server.service` / `nomic-embed-server.sh` - Nomic embedding model
 
-**Key features:**
-- Runs llama-server inside distrobox container
+**Key features (shared across wrappers):**
+- Runs llama-server natively on the host (ROCm 7.2), not inside distrobox — see "Building and Running llama.cpp" above
 - Automatic restart on failure
-- Proper process management and cleanup
 - Journal logging integration
-- Pre-configured for 128K context window with DeepSeek-style reasoning
+- Each model on its own port so multiple can run concurrently (see `nginx/` for routing across them)
 
-**Setup steps:**
-1. Copy wrapper script to a suitable location (e.g., `~/wrappers/`)
-2. Update paths in both files (replace `username` with your actual username)
-3. Make wrapper script executable: `chmod +x ~/wrappers/qwen3-coder-server.sh`
-4. Copy service file to systemd: `sudo cp systemctl/llama-server.service /etc/systemd/system/`
-5. Enable and start: `sudo systemctl enable --now llama-server`
-
-**The wrapper script includes:**
-- Optimized parameters for Strix Halo hardware
-- 128K context window support (-c 131072)
-- DeepSeek-style reasoning mode (--reasoning-format deepseek)
-- Qwen3 official sampling parameters (temp 0.6, top-p 0.95, top-k 20)
-- Parallel request handling (--parallel 2)
-- Comprehensive inline documentation
+**Setup steps (per model):**
+1. Copy the wrapper script to `~/wrappers/` and the matching `.service` file's `ExecStart` path should point at it
+2. Update paths in both files (replace `mornel`/`username` with your actual username)
+3. Make wrapper script executable: `chmod +x ~/wrappers/<script>.sh`
+4. Copy service file to systemd: `sudo cp systemctl/<name>.service /etc/systemd/system/`
+5. Enable and start: `sudo systemctl enable --now <name>`
 
 ## Server Deployment
 
-**Systemd service for llama-server:**
-- Production-ready service file available in `systemctl/llama-server.service`
-- Optimized wrapper script available in `systemctl/qwen3-coder-server.sh`
+**Systemd services for llama-server (see table above for the full current list):**
 - See LLAMA.CPP_SERVER.md for detailed setup guide
-- Enable with: `sudo systemctl enable --now llama-server`
-- Check status: `sudo systemctl status llama-server`
-- View logs: `sudo journalctl -u llama-server -f`
+- Enable with: `sudo systemctl enable --now <service-name>`
+- Check status: `sudo systemctl status <service-name>`
+- View logs: `sudo journalctl -u <service-name> -f`
 
 **Firewall configuration:**
 ```bash
@@ -299,6 +331,12 @@ sudo ufw allow from 192.168.1.0/24 to any port 8080
 - llama-server implements OpenAI-compatible API
 - Base URL: `http://SERVER_IP:8080/v1`
 - Works with OpenAI Python library, Continue.dev, Cursor, etc.
+
+## Additional Infrastructure
+
+**`nginx/`** - OpenAI-compatible API gateway with dynamic model routing across all the per-model llama-server instances above (routes by the `"model"` field in the request body onto the right port). See `nginx/README.md` for setup.
+
+**`docker-relay/`** - Dockerized relay (nginx + a small FastAPI app + `cloudflared`) for exposing local models to external clients through a Cloudflare Tunnel, without opening inbound ports on the router/firewall.
 
 ## Multi-Model Support
 
