@@ -18,7 +18,7 @@ LOG_FILE="$HOME/.local/log/qwen3-coder-server.log"
 # Log startup
 echo "[$(date)] Starting Qwen3-Coder server..." >> "$LOG_FILE"
 
-export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 exec /home/mornel/llama.cpp/build/bin/llama-server \
   \

@@ -14,7 +14,7 @@ export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 mkdir -p "$HOME/.local/log"
 LOG_FILE="$HOME/.local/log/Bielik-4.5B-v3.0-Instruct.log"
 
-export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 exec /home/mornel/llama.cpp/build/bin/llama-server \
   \

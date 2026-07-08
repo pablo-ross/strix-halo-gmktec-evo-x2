@@ -52,7 +52,7 @@ Dockerized relay (nginx + FastAPI + Cloudflare Tunnel) for exposing local models
 
 ```bash
 cd ~/llama.cpp
-export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
+export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"
 
 # Run inference
 ./build/bin/llama-cli \

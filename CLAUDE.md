@@ -73,9 +73,9 @@ distrobox enter llama-rocm-7rc-rocwmma
 
 **Install ROCm 7.2 on host:**
 ```bash
-# /etc/apt/sources.list.d/rocm.list should point at rocm/apt/7.2
+# /etc/apt/sources.list.d/rocm.list should point at rocm/apt/7.2.4
 sudo apt install rocm-hip-runtime-dev hipblas-dev
-# Installs to /opt/rocm-7.2.0
+# Installs to /opt/rocm-7.2.4
 ```
 
 **Location:** `~/llama.cpp` (native checkout, not inside a container)
@@ -89,11 +89,11 @@ sudo apt install -y cmake g++ git libcurl4-openssl-dev
 ```bash
 CC=/usr/bin/gcc CXX=/usr/bin/g++ cmake -S . -B build \
   -DGGML_HIP=ON \
-  -DCMAKE_HIP_FLAGS="--rocm-path=/opt/rocm-7.2.0 -mllvm --amdgpu-unroll-threshold-local=600" \
+  -DCMAKE_HIP_FLAGS="--rocm-path=/opt/rocm-7.2.4 -mllvm --amdgpu-unroll-threshold-local=600" \
   -DAMDGPU_TARGETS=gfx1151 \
   -DCMAKE_BUILD_TYPE=Release \
   -DGGML_RPC=ON \
-  -DROCM_PATH=/opt/rocm-7.2.0 \
+  -DROCM_PATH=/opt/rocm-7.2.4 \
   -DHIP_PLATFORM=amd
 
 cmake --build build --config Release -j$(nproc)
@@ -106,7 +106,7 @@ Key flags:
 
 **Binaries location:** `build/bin/`
 
-**Running:** set `LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"` before invoking `llama-server`/`llama-cli` (see `wrappers/*.sh` for real examples), and always pass `-fa 1` (flash attention) and `--no-mmap` — both are required on Strix Halo to avoid crashes/slowdowns.
+**Running:** set `LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"` before invoking `llama-server`/`llama-cli` (see `wrappers/*.sh` for real examples), and always pass `-fa 1` (flash attention) and `--no-mmap` — both are required on Strix Halo to avoid crashes/slowdowns.
 
 ### Running Inference
 
@@ -114,11 +114,11 @@ Key flags:
 - `--no-mmap` (llama-cli) or `-mmp 0` (llama-bench): Required for GPU backends
 - `-ngl 99` (or 999): Offload all layers to GPU
 - `-fa 1`: Flash attention — required on Strix Halo, prevents crashes (added after the ROCm 7.2 migration; see `LLAMA_ISSUES_SUMMARY.md`)
-- When running natively on the host (not distrobox), first: `export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"`
+- When running natively on the host (not distrobox), first: `export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"`
 
 **CLI inference:**
 ```bash
-export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
+export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"
 ./build/bin/llama-cli \
   -m ~/models/model.gguf \
   --no-mmap \
@@ -130,7 +130,7 @@ export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
 
 **Benchmark:**
 ```bash
-export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
+export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"
 ./build/bin/llama-bench \
   -m ~/models/model.gguf \
   -mmp 0 \
@@ -142,7 +142,7 @@ export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
 
 **Server mode:**
 ```bash
-export LD_LIBRARY_PATH="/opt/rocm-7.2.0/lib"
+export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"
 ./build/bin/llama-server \
   -m ~/models/model.gguf \
   --host 0.0.0.0 \
