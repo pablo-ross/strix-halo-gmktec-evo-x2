@@ -171,6 +171,6 @@ echo
 echo "  curl -X POST ${BASE_URL}/v1/chat/completions \\"
 echo "    -H 'Content-Type: application/json' \\"
 echo "    -d '{"
-echo "      \"model\": \"Qwen3-Coder-30B-A3B-Instruct\","
+echo "      \"model\": \"Qwen3-Coder-Next\","
 echo "      \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}]"
 echo "    }'"

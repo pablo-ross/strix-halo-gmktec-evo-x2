@@ -39,7 +39,7 @@ sudo ./setup.sh
 curl http://10.0.0.60/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "Qwen3-Coder-30B-A3B-Instruct",
+    "model": "Qwen3-Coder-Next",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```
@@ -70,7 +70,7 @@ MODEL_2=BIELIK:8081:bielik
 
 The gateway inspects the `"model"` field in JSON requests:
 
-1. **Exact match**: `"model": "Qwen3-Coder-30B-A3B-Instruct"` → Port 8080
+1. **Exact match**: `"model": "Qwen3-Coder-Next"` → Port 8080
 2. **Pattern match**: `"model": "some-qwen-variant"` → Port 8080 (contains "qwen")
 3. **Default**: No match or no model field → Default model (first in config)
 
@@ -114,7 +114,7 @@ POST /v1/chat/completions
 Content-Type: application/json
 
 {
-  "model": "Qwen3-Coder-30B-A3B-Instruct",
+  "model": "Qwen3-Coder-Next",
   "messages": [
     {"role": "user", "content": "Hello"}
   ]
@@ -151,7 +151,7 @@ client = OpenAI(
 
 # Route to Qwen3 (port 8080)
 response = client.chat.completions.create(
-    model="Qwen3-Coder-30B-A3B-Instruct",
+    model="Qwen3-Coder-Next",
     messages=[{"role": "user", "content": "Hello"}]
 )
 
@@ -168,9 +168,9 @@ response = client.chat.completions.create(
 {
   "models": [
     {
-      "title": "Qwen3 Coder 30B",
+      "title": "Qwen3 Coder Next",
       "provider": "openai",
-      "model": "Qwen3-Coder-30B-A3B-Instruct",
+      "model": "Qwen3-Coder-Next",
       "apiBase": "http://10.0.0.60/v1"
     },
     {
@@ -190,7 +190,7 @@ response = client.chat.completions.create(
 curl http://10.0.0.60/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "Qwen3-Coder-30B-A3B-Instruct",
+    "model": "Qwen3-Coder-Next",
     "messages": [{"role": "user", "content": "Write a Python function"}]
   }'
 
@@ -244,7 +244,7 @@ curl http://127.0.0.1:8081/v1/models
 └────────────────┬────────────────────────────────┘
                  │
                  │ HTTP Request
-                 │ {"model": "Qwen3-Coder-30B-A3B-Instruct", ...}
+                 │ {"model": "Qwen3-Coder-Next", ...}
                  │
                  ▼
 ┌─────────────────────────────────────────────────┐
