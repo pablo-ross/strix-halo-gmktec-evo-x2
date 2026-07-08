@@ -1,11 +1,17 @@
 #!/bin/bash
 
 # ==============================================================================
-# Qwen3-Coder-30B llama-server Configuration v4.1 (Stability Optimized)
+# Qwen3-Coder-Next llama-server Configuration v5.0
 # ==============================================================================
 # Hardware: AMD Ryzen AI Max+ 395 w/ Radeon 8060S (Strix Halo)
 # Use Case: Continue.dev IDE integration (autocomplete, chat, edits)
-# Changes: Reduced to 64K context, removed kv-unified for stability
+# Changes: Swapped Qwen3-Coder-30B-A3B (dense attention) for Qwen3-Coder-Next
+#          (80B total / 3B active, hybrid Gated-DeltaNet+attention MoE) at
+#          UD-Q4_K_XL (~50GB) so it coexists with Bielik-11B + 3 running VMs
+#          on this box's shared ~120GB GTT/RAM budget. Context trimmed from
+#          200K to 128K for the same reason. The old model name still works
+#          for existing clients via an alias rewrite in
+#          docker-relay/app/main.py (see docker-relay/.env MODEL_ALIASES).
 # ==============================================================================
 
 # Wrapper for systemd - ensures XDG_RUNTIME_DIR is set for podman
@@ -16,15 +22,15 @@ mkdir -p "$HOME/.local/log"
 LOG_FILE="$HOME/.local/log/qwen3-coder-server.log"
 
 # Log startup
-echo "[$(date)] Starting Qwen3-Coder server..." >> "$LOG_FILE"
+echo "[$(date)] Starting Qwen3-Coder-Next server..." >> "$LOG_FILE"
 
 export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 exec /home/mornel/llama.cpp/build/bin/llama-server \
   \
   `# MODEL CONFIGURATION` \
-  -m /home/mornel/models/Qwen3-Coder-30B-A3B-Instruct-UD-Q8_K_XL.gguf \
-  --alias Qwen3-Coder-30B-A3B-Instruct \
+  -m /home/mornel/models/Qwen3-Coder-Next-UD-Q4_K_XL.gguf \
+  --alias Qwen3-Coder-Next \
   \
   `# NETWORK` \
   --host 0.0.0.0 \
@@ -40,9 +46,9 @@ exec /home/mornel/llama.cpp/build/bin/llama-server \
   --no-mmap \
   \
   `# CONTEXT & MEMORY` \
-  -c 200000 \
+  -c 131072 \
   --n-predict 4096 \
-  `# 64K context - more stable, still enough for most coding tasks` \
+  `# 128K context - trimmed from 200K to leave GTT headroom for Bielik + VMs` \
   --cache-reuse 2048 \
   `# KV cache reuse - critical for Continue's similar context pattern` \
   --cache-type-k f16 \

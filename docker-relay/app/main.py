@@ -1,3 +1,4 @@
+import json
 import os
 
 import httpx
@@ -7,6 +8,14 @@ from fastapi.responses import Response, StreamingResponse
 BACKEND_URL = os.getenv("BACKEND_URL", "http://10.0.0.60").rstrip("/")
 _raw_tokens = os.getenv("API_TOKENS", "")
 API_TOKENS = {t.strip() for t in _raw_tokens.split(",") if t.strip()}
+
+# Lets old/retired model names in client requests keep working after a
+# backend swap, without having to update every client.
+# Format: "old-name-1:new-name-1,old-name-2:new-name-2"
+_raw_aliases = os.getenv("MODEL_ALIASES", "")
+MODEL_ALIASES = dict(
+    pair.split(":", 1) for pair in _raw_aliases.split(",") if ":" in pair
+)
 
 app = FastAPI(title="LLM API Relay")
 
@@ -37,6 +46,15 @@ async def health():
 async def proxy(path: str, request: Request, _=Depends(verify_token)):
     url = f"{BACKEND_URL}/{path}"
     body = await request.body()
+
+    if MODEL_ALIASES and "application/json" in request.headers.get("content-type", ""):
+        try:
+            payload = json.loads(body)
+        except ValueError:
+            payload = None
+        if isinstance(payload, dict) and payload.get("model") in MODEL_ALIASES:
+            payload["model"] = MODEL_ALIASES[payload["model"]]
+            body = json.dumps(payload).encode()
 
     # Strip headers that must not be forwarded
     forward_headers = {
