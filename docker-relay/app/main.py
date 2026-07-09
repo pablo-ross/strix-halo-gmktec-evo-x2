@@ -9,6 +9,34 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://10.0.0.60").rstrip("/")
 _raw_tokens = os.getenv("API_TOKENS", "")
 API_TOKENS = {t.strip() for t in _raw_tokens.split(",") if t.strip()}
 
+# Caps how many requests are forwarded to the backend at once. The backend is a
+# single GPU (one llama-server slot pool per model, all sharing one machine's
+# compute) — without this, every caller's request gets accepted and queued
+# invisibly inside llama-server instead of failing fast. Default of 4 matches
+# the smallest currently-configured --parallel slot count (Bielik-11B).
+#
+# A plain counter (not asyncio.Semaphore) on purpose: this process is single
+# worker/single-threaded, and nothing awaits between the check and increment
+# below, so it's already atomic — no need for a Semaphore, whose non-blocking
+# acquire via wait_for(..., timeout=0) can spuriously time out even when a
+# permit is free (a known asyncio gotcha).
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "4"))
+_inflight_count = 0
+
+
+def _try_acquire() -> bool:
+    global _inflight_count
+    if _inflight_count >= MAX_CONCURRENT_REQUESTS:
+        return False
+    _inflight_count += 1
+    return True
+
+
+def _release() -> None:
+    global _inflight_count
+    _inflight_count -= 1
+
+
 # Lets old/retired model names in client requests keep working after a
 # backend swap, without having to update every client.
 # Format: "old-name-1:new-name-1,old-name-2:new-name-2"
@@ -44,6 +72,22 @@ async def health():
     methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
 )
 async def proxy(path: str, request: Request, _=Depends(verify_token)):
+    if not _try_acquire():
+        raise HTTPException(
+            429,
+            f"Server busy: {MAX_CONCURRENT_REQUESTS} requests already in flight, try again shortly",
+        )
+    try:
+        return await _proxy(path, request)
+    except BaseException:
+        _release()
+        raise
+
+
+async def _proxy(path: str, request: Request):
+    # Caller releases _inflight once this returns: immediately on the
+    # non-streaming path below, or when the SSE generator finishes for
+    # streaming responses (a real in-flight request until the last byte).
     url = f"{BACKEND_URL}/{path}"
     body = await request.body()
 
@@ -84,6 +128,7 @@ async def proxy(path: str, request: Request, _=Depends(verify_token)):
             finally:
                 await resp.aclose()
                 await client.aclose()
+                _release()
 
         return StreamingResponse(
             _stream(),
@@ -91,13 +136,16 @@ async def proxy(path: str, request: Request, _=Depends(verify_token)):
             media_type="text/event-stream",
         )
 
-    content = await resp.aread()
-    await resp.aclose()
-    await client.aclose()
+    try:
+        content = await resp.aread()
+    finally:
+        await resp.aclose()
+        await client.aclose()
 
     response_headers = {
         k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP
     }
+    _release()
     return Response(
         content=content,
         status_code=resp.status_code,
