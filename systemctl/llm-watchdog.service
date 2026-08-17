@@ -1,0 +1,8 @@
+[Unit]
+Description=Probe llama-server backends for silent output corruption
+After=llama-server.service bielik-server.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/mornel/wrappers/llm-watchdog.sh
+TimeoutStartSec=600

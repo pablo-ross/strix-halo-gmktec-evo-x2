@@ -108,7 +108,11 @@ Key flags:
 
 **Keep this build current.** As of August 17, 2026 it sits at upstream `666f8898a`. It had previously drifted 5.5 months behind, and simply fast-forwarding to master and rebuilding gained **+22% generation speed** on the production coding model (33–35 → 42.3 t/s) — no config change involved. Update with `git -C ~/llama.cpp merge --ff-only origin/master` then re-run the build command above; back up `build/bin` first, since every systemd service on this box shares this one build. See `QWEN3.8-27B_EVALUATION.md`.
 
-**MTP / speculative decoding** is available on current master (`-md <draft.gguf> -ngld 99 --spec-draft-n-max N --spec-draft-p-min P`). Models shipping an MTP head (e.g. `ggml-org/Qwen3.8-27B-GGUF` ships a paired `mtp-*.gguf`) can self-speculate without a separate draft model — measured 2.4x on code generation, 1.34x on prose. Acceptance rate is exposed via `/metrics` as `llamacpp:spec_decode_num_{draft,accepted}_tokens_total`. Not currently used by any production wrapper.
+**MTP / speculative decoding** is available on current master (`--spec-type draft-mtp -md <draft.gguf> -ngld 99 --spec-draft-n-max N`). Models shipping an MTP head (e.g. `ggml-org/Qwen3.8-27B-GGUF` ships a paired `mtp-*.gguf`) can self-speculate without a separate draft model — measured **1.3–1.7x** on this hardware, larger gains on heavier quants. Acceptance rate is exposed via `/metrics` as `llamacpp:spec_decode_num_{draft,accepted}_tokens_total`. Not currently used by any production wrapper.
+
+Two non-obvious things about it (both measured — see `QWEN3.8-27B_EVALUATION.md`):
+- **Leave `--spec-draft-p-min` at its `0.00` default.** Gating drafts at `0.60` raised acceptance from 40% to 75% but was *slower* in every pairing. Throughput follows tokens-accepted-per-verify-pass, not acceptance percentage; a high acceptance rate usually means the drafter is being too timid. `--spec-draft-n-max 3` was the best value tested.
+- **Benchmark with ~1024 output tokens at temp 0.** Short generations on a warm server overstate the gain badly (a ~300-token run reported 2.4x where the controlled run showed 1.31x).
 
 **Running:** set `LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"` before invoking `llama-server`/`llama-cli` (see `wrappers/*.sh` for real examples), and always pass `-fa 1` (flash attention) and `--no-mmap` — both are required on Strix Halo to avoid crashes/slowdowns.
 
@@ -226,6 +230,15 @@ hf download TheBloke/Llama-2-7B-GGUF llama-2-7b.Q4_K_M.gguf --local-dir ~/models
 
 ### llama.cpp Runtime Issues
 
+**Server returns `//////////` (or `??????????`) for every prompt — UNRESOLVED:**
+- Symptom: llama-server emits degenerate repeated characters for *all* prompts, in any language, via chat **and** `/v1/completions` (so it is not a chat-template problem). No errors in the journal, no GPU faults in `dmesg`, and throughput stays completely normal (42 t/s) — the server is confidently generating garbage tokens.
+- Fix: `sudo systemctl restart llama-server.service` clears it (~90 s).
+- Observed twice on 2026-08-17, both times on `Qwen3-Coder-Next` after 21–30 min of **mostly idle** uptime, on llama.cpp `666f8898a`.
+- **Ruled out by testing:** concurrency (4 parallel requests on a `--parallel 2` server did not reproduce); cumulative graph reuse (352 sequential requests / 26k reused graphs stayed clean); memory pressure (PSI was flat 0.00 at the moment of failure); the GPU/ROCm stack itself (Bielik on the same GPU stayed healthy throughout); OpenWebUI (reproduced with plain `curl`).
+- **Key asymmetry:** only the 46 GiB 80B-A3B MoE model is affected. The 11 GiB dense model on the same GPU and same build never has been. Suspicion is therefore on this model + the MoE kernel fusion added since the March build, but this is unproven.
+- Current state: `~/wrappers/qwen3-coder-server.sh` is **temporarily pinned** to the pre-update binaries in `~/llama.cpp/bin-backup-4d828bd1a` (costs ~15% speed) as an A/B test, with Bielik left on the new build as the control. Revert with the `.newbuild-bak` copy beside it. Note this means the deployed wrapper intentionally differs from the copy in this repo.
+- `llm-watchdog.timer` (below) detects recurrences, captures full system state, and restarts the affected unit.
+
 **Invalid argument `--ngl`:**
 - Use `-ngl` (single dash) not `--ngl` (double dash)
 
@@ -306,6 +319,7 @@ The `systemctl/` directory contains production-ready systemd unit files, one per
 - `qwen25-7b-server.service` / `qwen25-7b-autocomplete-server.sh` - Qwen2.5-7B autocomplete
 - `e5-large-server.service` / `e5-large-server.sh` - E5-Large-v2 embedding model
 - `nomic-embed-server.service` / `nomic-embed-server.sh` - Nomic embedding model
+- `llm-watchdog.timer` + `llm-watchdog.service` / `llm-watchdog.sh` - health watchdog (not a model). Probes ports 8080/8081 every 5 min for the silent output-corruption bug documented under "Common Issues"; requires two consecutive degenerate replies before acting, logs full system state to `~/.local/log/llm-watchdog.log`, then restarts the affected unit. Install: `sudo cp systemctl/llm-watchdog.* /etc/systemd/system/ && sudo systemctl enable --now llm-watchdog.timer`
 
 **Key features (shared across wrappers):**
 - Runs llama-server natively on the host (ROCm 7.2), not inside distrobox — see "Building and Running llama.cpp" above
