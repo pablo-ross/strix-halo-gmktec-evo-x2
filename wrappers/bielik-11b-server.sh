@@ -35,14 +35,23 @@ exec /home/mornel/llama.cpp/build/bin/llama-server \
   --no-mmap \
   \
   `# CONTEXT & MEMORY (Larger context possible with smaller model)` \
-  -c 65536 \
-  `# 64K context - plenty for 11B model` \
+  -c 32768 \
+  `# 32K total context. NOTE: -c is the TOTAL budget split across --parallel` \
+  `# slots, so 32768/2 = 16K per slot - the same per-slot context as the` \
+  `# previous "-c 65536 --parallel 4", at half the KV cache.` \
   --cache-reuse 2048 \
   `# KV cache reuse for efficiency` \
+  --cache-type-k q8_0 \
+  --cache-type-v q8_0 \
+  `# Quantized KV (needs -fa 1, set above). Bielik is a DENSE 11B, so unlike` \
+  `# Qwen3-Coder-Next's Gated-DeltaNet layers its KV cache is huge: it measured` \
+  `# 12.5 GiB, larger than the 10.9 GiB of weights. Halving the total context` \
+  `# and quantizing K/V takes that to ~3.2 GiB, freeing ~9 GiB on a box that` \
+  `# runs at ~102/124 GB alongside Qwen + 4 VMs.` \
   \
   `# PARALLEL PROCESSING` \
-  --parallel 4 \
-  `# 4 slots - Q8_0 quantization uses ~2x memory vs Q4_K_M` \
+  --parallel 2 \
+  `# 2 slots - see the -c note above; per-slot context is unchanged at 16K` \
   -sps 0.5 \
   `# Slot prompt similarity` \
   -cb \
