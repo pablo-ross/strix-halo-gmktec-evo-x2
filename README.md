@@ -34,6 +34,9 @@ Quick reference guide for Claude Code with common commands, troubleshooting step
 ### [LLAMA_ISSUES_SUMMARY.md](LLAMA_ISSUES_SUMMARY.md)
 Incident writeup on a kernel 6.17 update breaking the KFD ABI against the ROCm 7.0-rc distrobox container, and the fix (moving to a native-host ROCm 7.2 build). Read this if llama-server crashes after a kernel update, or if you're deciding between the container and native-host build paths.
 
+### [QWEN3.8-27B_EVALUATION.md](QWEN3.8-27B_EVALUATION.md)
+Evaluation of switching the coding model to Qwen3.8-27B (as packaged by `julianmb/q38rocm`). Rejected — measured 4x slower generation on this bandwidth-bound APU despite better benchmark scores. Also documents why the custom `ROCmFPX` fork isn't needed (upstream llama.cpp covers it), why the Vulkan-vs-ROCm decode claim doesn't reproduce here, and how to use MTP speculative decoding on stock builds. Read before re-litigating a model swap.
+
 ### [OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md), [MULTI_MODEL_DEPLOYMENT.md](MULTI_MODEL_DEPLOYMENT.md), [MULTI_MODEL_SUMMARY.md](MULTI_MODEL_SUMMARY.md), [MULTI_SERVER_STARTUP_ANALYSIS.md](MULTI_SERVER_STARTUP_ANALYSIS.md), [QWEN3-CODER-30B_BENCHMARK.md](QWEN3-CODER-30B_BENCHMARK.md)
 Follow-on notes covering running multiple models concurrently and per-model benchmark/tuning results.
 
@@ -86,6 +89,7 @@ export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"
 - **Always use `-fa 1`** (flash attention) on Strix Halo to avoid crashes
 - **Kernel 6.16.9+** required for full memory access; kernel 6.17+ needs ROCm 7.2 native host build, not the older distrobox container (see LLAMA_ISSUES_SUMMARY.md)
 - **GTT memory** (128GB) is used for compute, not VRAM (1GB)
+- **Keep `~/llama.cpp` current** — it went 5.5 months stale once, and a plain rebuild at master recovered +22% generation speed (see [QWEN3.8-27B_EVALUATION.md](QWEN3.8-27B_EVALUATION.md))
 
 ## References
 

@@ -106,6 +106,10 @@ Key flags:
 
 **Binaries location:** `build/bin/`
 
+**Keep this build current.** As of August 17, 2026 it sits at upstream `666f8898a`. It had previously drifted 5.5 months behind, and simply fast-forwarding to master and rebuilding gained **+22% generation speed** on the production coding model (33–35 → 42.3 t/s) — no config change involved. Update with `git -C ~/llama.cpp merge --ff-only origin/master` then re-run the build command above; back up `build/bin` first, since every systemd service on this box shares this one build. See `QWEN3.8-27B_EVALUATION.md`.
+
+**MTP / speculative decoding** is available on current master (`-md <draft.gguf> -ngld 99 --spec-draft-n-max N --spec-draft-p-min P`). Models shipping an MTP head (e.g. `ggml-org/Qwen3.8-27B-GGUF` ships a paired `mtp-*.gguf`) can self-speculate without a separate draft model — measured 2.4x on code generation, 1.34x on prose. Acceptance rate is exposed via `/metrics` as `llamacpp:spec_decode_num_{draft,accepted}_tokens_total`. Not currently used by any production wrapper.
+
 **Running:** set `LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"` before invoking `llama-server`/`llama-cli` (see `wrappers/*.sh` for real examples), and always pass `-fa 1` (flash attention) and `--no-mmap` — both are required on Strix Halo to avoid crashes/slowdowns.
 
 ### Running Inference
@@ -226,8 +230,9 @@ hf download TheBloke/Llama-2-7B-GGUF llama-2-7b.Q4_K_M.gguf --local-dir ~/models
 - Use `-ngl` (single dash) not `--ngl` (double dash)
 
 **`--no-mmap` invalid in llama-bench:**
-- Use `-mmp 0` or `--mmap 0` instead
+- Use `--load-mode direct` instead
 - `--no-mmap` only works with `llama-cli`
+- `-mmp 0` / `--mmap 0` was the old spelling; still accepted on current master but prints a deprecation warning
 
 **`hf: command not found`:**
 - HuggingFace CLI changed from `huggingface-cli` to `hf`
@@ -262,6 +267,7 @@ hf download TheBloke/Llama-2-7B-GGUF llama-2-7b.Q4_K_M.gguf --local-dir ~/models
 6. **Kernel 6.16.9+ is critical** for >15GB VRAM access; kernel 6.17+ requires ROCm 7.2 (native host build) rather than the older ROCm 7.0-rc distrobox container, due to a KFD ABI break (see `LLAMA_ISSUES_SUMMARY.md`)
 7. **`ROCBLAS_USE_HIPBLASLT=1`** was set by default in the kyuz0 distrobox containers; not currently exported anywhere in the native host setup (`wrappers/*.sh`), so don't assume it's set if running natively
 8. **Optimal batch size is 512** for this hardware
+9. **Decode speed on this box is memory-bandwidth bound, not compute bound** (~208 GB/s sustained). Generation throughput ≈ bandwidth ÷ bytes-of-active-weights-per-token, so **active parameters dominate model choice**: a 27B dense model decodes ~4x slower than an 80B-A3B MoE despite being 2.6x smaller on disk. Backend choice (ROCm vs Vulkan) changes decode by <2%. Evaluate any proposed model swap against this first — see `QWEN3.8-27B_EVALUATION.md`
 
 ## Verification Commands
 
@@ -335,6 +341,8 @@ sudo ufw allow from 192.168.1.0/24 to any port 8080
 ## Additional Infrastructure
 
 **`nginx/`** - OpenAI-compatible API gateway with dynamic model routing across all the per-model llama-server instances above (routes by the `"model"` field in the request body onto the right port). See `nginx/README.md` for setup.
+
+  **Gotcha:** the installed `/etc/nginx/sites-enabled/llama-api` server block declares `listen 80;` only. Requests to `http://localhost/...` resolve to `::1`, miss it, and hit nginx's default server with a **404**. Test against `127.0.0.1` or the LAN IP, or add `listen [::]:80;` to that block.
 
 **`docker-relay/`** - Dockerized relay (nginx + a small FastAPI app + `cloudflared`) for exposing local models to external clients through a Cloudflare Tunnel, without opening inbound ports on the router/firewall.
 
