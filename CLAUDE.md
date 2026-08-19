@@ -106,7 +106,9 @@ Key flags:
 
 **Binaries location:** `build/bin/`
 
-**Keep this build current.** As of August 17, 2026 it sits at upstream `666f8898a`. It had previously drifted 5.5 months behind, and simply fast-forwarding to master and rebuilding gained **+22% generation speed** on the production coding model (33–35 → 42.3 t/s) — no config change involved. Update with `git -C ~/llama.cpp merge --ff-only origin/master` then re-run the build command above; back up `build/bin` first, since every systemd service on this box shares this one build. See `QWEN3.8-27B_EVALUATION.md`.
+**Build currency: update, but validate before trusting.** The tree sits at upstream `666f8898a`, but **every production wrapper is pinned back to `~/llama.cpp/bin-backup-4d828bd1a` (2026-03-02)** because `666f8898a` silently corrupts output on this hardware — see the corruption entry under "Common Issues" below. The update did measure **+22% generation speed** (33–35 → 42.3 t/s), so it is worth retrying on a future upstream revision, but that number was obtained before the corruption was understood and is not currently realisable.
+
+Update with `git -C ~/llama.cpp merge --ff-only origin/master` then re-run the build command above. **Always back up `build/bin` first** — every systemd service on this box shares this one build, and the backup is what makes rollback possible. **Never promote a new build without running the corruption check** (`wrappers/llm-watchdog.sh`'s probe, or the reproducer in `LLAMA_ISSUES_SUMMARY.md`): the failure is invisible to short prompts and to casual use. See `QWEN3.8-27B_EVALUATION.md`.
 
 **MTP / speculative decoding** is available on current master (`--spec-type draft-mtp -md <draft.gguf> -ngld 99 --spec-draft-n-max N`). Models shipping an MTP head (e.g. `ggml-org/Qwen3.8-27B-GGUF` ships a paired `mtp-*.gguf`) can self-speculate without a separate draft model — measured **1.3–1.7x** on this hardware, larger gains on heavier quants. Acceptance rate is exposed via `/metrics` as `llamacpp:spec_decode_num_{draft,accepted}_tokens_total`. Not currently used by any production wrapper.
 
@@ -114,7 +116,7 @@ Two non-obvious things about it (both measured — see `QWEN3.8-27B_EVALUATION.m
 - **Leave `--spec-draft-p-min` at its `0.00` default.** Gating drafts at `0.60` raised acceptance from 40% to 75% but was *slower* in every pairing. Throughput follows tokens-accepted-per-verify-pass, not acceptance percentage; a high acceptance rate usually means the drafter is being too timid. `--spec-draft-n-max 3` was the best value tested.
 - **Benchmark with ~1024 output tokens at temp 0.** Short generations on a warm server overstate the gain badly (a ~300-token run reported 2.4x where the controlled run showed 1.31x).
 
-**Running:** set `LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"` before invoking `llama-server`/`llama-cli` (see `wrappers/*.sh` for real examples), and always pass `-fa 1` (flash attention) and `--no-mmap` — both are required on Strix Halo to avoid crashes/slowdowns.
+**Running:** set `LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"` before invoking `llama-server`/`llama-cli`. **Production wrappers additionally prepend `~/llama.cpp/bin-backup-4d828bd1a` to that path**, because they run the rolled-back binary and it must resolve its own `libllama.so` (see `wrappers/*.sh` for real examples), and always pass `-fa 1` (flash attention) and `--no-mmap` — both are required on Strix Halo to avoid crashes/slowdowns.
 
 ### Running Inference
 
@@ -230,14 +232,14 @@ hf download TheBloke/Llama-2-7B-GGUF llama-2-7b.Q4_K_M.gguf --local-dir ~/models
 
 ### llama.cpp Runtime Issues
 
-**Server returns `//////////` (or `??????????`) for every prompt — UNRESOLVED:**
-- Symptom: llama-server emits degenerate repeated characters for *all* prompts, in any language, via chat **and** `/v1/completions` (so it is not a chat-template problem). No errors in the journal, no GPU faults in `dmesg`, and throughput stays completely normal (42 t/s) — the server is confidently generating garbage tokens.
-- Fix: `sudo systemctl restart llama-server.service` clears it (~90 s).
-- Observed twice on 2026-08-17, both times on `Qwen3-Coder-Next` after 21–30 min of **mostly idle** uptime, on llama.cpp `666f8898a`.
-- **Ruled out by testing:** concurrency (4 parallel requests on a `--parallel 2` server did not reproduce); cumulative graph reuse (352 sequential requests / 26k reused graphs stayed clean); memory pressure (PSI was flat 0.00 at the moment of failure); the GPU/ROCm stack itself (Bielik on the same GPU stayed healthy throughout); OpenWebUI (reproduced with plain `curl`).
-- **Key asymmetry:** only the 46 GiB 80B-A3B MoE model is affected. The 11 GiB dense model on the same GPU and same build never has been. Suspicion is therefore on this model + the MoE kernel fusion added since the March build, but this is unproven.
-- Current state: `~/wrappers/qwen3-coder-server.sh` is **temporarily pinned** to the pre-update binaries in `~/llama.cpp/bin-backup-4d828bd1a` (costs ~15% speed) as an A/B test, with Bielik left on the new build as the control. Revert with the `.newbuild-bak` copy beside it. Note this means the deployed wrapper intentionally differs from the copy in this repo.
-- `llm-watchdog.timer` (below) detects recurrences, captures full system state, and restarts the affected unit.
+**Silent output corruption on llama.cpp `666f8898a` — ROOT-CAUSED 2026-08-19, fixed by rollback:**
+- Symptom, two faces of one bug. On `Qwen3-Coder-Next` it was loud: `//////////` for every prompt. On `Bielik-11B` it was quiet and went unnoticed for two days: mangled tokens (`cztefyry` for `cztery`), verbatim regurgitation of the prompt, and leakage of KV state from *unrelated earlier requests* — text from an Aug 17 validation prompt resurfaced inside unrelated Aug 19 generations.
+- **Trigger is prompt length, not uptime, load, or generation length.** Clean below ~1600 prompt tokens, corrupt above. 2940 tokens of *generation* stayed clean, so it is a prefill-side fault.
+- **Cause: the binary.** `4d828bd1a` → `666f8898a` (5.5 months of upstream). Nothing else.
+- **Ruled out by direct test**, each with a restart and re-run of the reproducer: `--cache-type-k/v q8_0` (fails identically on f16); the 8 GiB server-side prompt cache added in this jump (`--cache-ram 0` fails identically — though it *did* stop the cross-request leakage, so it explains that symptom only); the `-c`/`--parallel` change; concurrency; memory pressure (PSI flat 0.00).
+- **Fix:** both wrappers exec `~/llama.cpp/bin-backup-4d828bd1a/llama-server` and **must** prepend that directory to `LD_LIBRARY_PATH`. Without the path prefix the old binary loads the new `libllama.so` and dies with `undefined symbol: llama_params_fit`, crash-looping the unit.
+- Cost of the rollback: the +22% generation speed from the update.
+- Reproducer and full bisection: `LLAMA_ISSUES_SUMMARY.md`.
 
 **Invalid argument `--ngl`:**
 - Use `-ngl` (single dash) not `--ngl` (double dash)
@@ -319,7 +321,7 @@ The `systemctl/` directory contains production-ready systemd unit files, one per
 - `qwen25-7b-server.service` / `qwen25-7b-autocomplete-server.sh` - Qwen2.5-7B autocomplete
 - `e5-large-server.service` / `e5-large-server.sh` - E5-Large-v2 embedding model
 - `nomic-embed-server.service` / `nomic-embed-server.sh` - Nomic embedding model
-- `llm-watchdog.timer` + `llm-watchdog.service` / `llm-watchdog.sh` - health watchdog (not a model). Probes ports 8080/8081 every 5 min for the silent output-corruption bug documented under "Common Issues"; requires two consecutive degenerate replies before acting, logs full system state to `~/.local/log/llm-watchdog.log`, then restarts the affected unit. Install: `sudo cp systemctl/llm-watchdog.* /etc/systemd/system/ && sudo systemctl enable --now llm-watchdog.timer`
+- `llm-watchdog.timer` + `llm-watchdog.service` / `llm-watchdog.sh` - health watchdog (not a model). Probes ports 8080/8081 every 5 min for the output-corruption bug documented under "Common Issues". The probe sends a **~2000-token** prompt with a needle buried in it and requires the **exact** expected answer back; two consecutive failures trigger a state snapshot to `~/.local/log/llm-watchdog.log` and a restart of the affected unit. Both the length and the strictness matter: the original probe (`"List three colours."` + a "≤3 distinct characters" test) **never fired once in 46 h against a provably broken server**, because corruption needs a long prompt to appear and subtle corruption has plenty of distinct characters. Verified 2026-08-19 to fire 3/3 on the bad build and stay quiet on the good one. Install: `sudo cp systemctl/llm-watchdog.* /etc/systemd/system/ && sudo systemctl enable --now llm-watchdog.timer`
 
 **Key features (shared across wrappers):**
 - Runs llama-server natively on the host (ROCm 7.2), not inside distrobox — see "Building and Running llama.cpp" above

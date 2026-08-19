@@ -89,7 +89,7 @@ export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib"
 - **Always use `-fa 1`** (flash attention) on Strix Halo to avoid crashes
 - **Kernel 6.16.9+** required for full memory access; kernel 6.17+ needs ROCm 7.2 native host build, not the older distrobox container (see LLAMA_ISSUES_SUMMARY.md)
 - **GTT memory** (128GB) is used for compute, not VRAM (1GB)
-- **Keep `~/llama.cpp` current** — it went 5.5 months stale once, and a plain rebuild at master recovered +22% generation speed (see [QWEN3.8-27B_EVALUATION.md](QWEN3.8-27B_EVALUATION.md))
+- **Keep `~/llama.cpp` current, but validate every build before trusting it** — a plain rebuild at master once recovered +22% generation speed, but the build that delivered it (`666f8898a`) silently corrupts output on this hardware, so all wrappers are pinned back to `bin-backup-4d828bd1a`. Always back up `build/bin` and run the corruption check before promoting a build (see [LLAMA_ISSUES_SUMMARY.md](LLAMA_ISSUES_SUMMARY.md))
 
 ## References
 

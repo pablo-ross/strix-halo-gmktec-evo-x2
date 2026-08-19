@@ -3,7 +3,7 @@
 **Date:** August 17, 2026
 **Question asked:** should production's coding model move from `Qwen3-Coder-Next` (80B-A3B) to `Qwen3.8-27B`, as packaged by [`julianmb/q38rocm`](https://github.com/julianmb/q38rocm)?
 **Answer:** **no** — the model is excellent but is 3–4x slower to generate on this hardware, and the packaging around it (custom llama.cpp fork + fork-only quant format) buys nothing measurable here.
-**Valuable side effect:** the investigation found `~/llama.cpp` was 5.5 months stale. Updating it gave production **+22% generation speed for free** (see [Engine update](#engine-update-the-actual-win) below).
+**Valuable side effect — since RETRACTED:** the investigation found `~/llama.cpp` was 5.5 months stale, and updating it measured **+22% generation speed** (see [Engine update](#engine-update-the-actual-win) below). It was not free. The new build (`666f8898a`) silently corrupts output on this hardware and was rolled back on 2026-08-19; the speed gain is not currently realisable. See `LLAMA_ISSUES_SUMMARY.md`.
 
 ---
 
@@ -155,7 +155,7 @@ Prefill matters disproportionately for Continue.dev, which ships large repo cont
 |---|---:|---:|
 | Generation (live server, 3 runs) | 33–35 t/s | **42.2–42.3 t/s** |
 
-**+22% on the model already in production**, from a rebuild alone — a larger real-world gain than the model swap would have delivered.
+**+22% on the model already in production**, from a rebuild alone — a larger real-world gain than the model swap would have delivered. **This gain has since been given up:** `666f8898a` silently corrupts output above ~1600 prompt tokens and was rolled back on 2026-08-19. The benchmark above is still believed accurate for throughput; it simply was not measuring correctness. Re-test on a future upstream revision.
 
 Verified after the update:
 
@@ -209,5 +209,5 @@ Building the Vulkan backend needs `glslc libvulkan-dev vulkan-tools spirv-header
 ---
 
 **Evaluation completed:** August 17, 2026
-**Outcome:** model swap rejected; llama.cpp updated to `666f8898a`; production unchanged at `Qwen3-Coder-Next-UD-Q4_K_XL`, now 22% faster
+**Outcome:** model swap rejected; llama.cpp update to `666f8898a` **rolled back on 2026-08-19** after it was root-caused as the source of silent output corruption on both production models; production unchanged at `Qwen3-Coder-Next-UD-Q4_K_XL`, running the `4d828bd1a` binaries at the original speed
 **Revised:** August 17, 2026 — MTP figures replaced with controlled-protocol measurements (1.3–1.7x, not 2.4x) and the `p-min` recommendation reversed; see Finding 3

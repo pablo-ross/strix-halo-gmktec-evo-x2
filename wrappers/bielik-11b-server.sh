@@ -14,9 +14,24 @@ export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 mkdir -p "$HOME/.local/log"
 LOG_FILE="$HOME/.local/log/Bielik-11B-v3.0-Instruct.log"
 
-export LD_LIBRARY_PATH="/opt/rocm-7.2.4/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# --- PINNED TO ROLLED-BACK llama.cpp BINARIES (2026-08-19) ----------------
+# Build 666f8898a silently corrupts output on this hardware above ~1600 prompt
+# tokens (mangled tokens, prompt regurgitation, KV bleed between unrelated
+# requests). Root-caused 2026-08-19 to the binary itself: NOT KV quantization,
+# NOT the new prompt cache, NOT context size. Both production models are pinned
+# to 4d828bd1a, which is verified clean. See LLAMA_ISSUES_SUMMARY.md.
+#
+# The LD_LIBRARY_PATH prefix below is REQUIRED: without it this binary loads the
+# newer libllama.so from build/bin and dies with `undefined symbol:
+# llama_params_fit`, crash-looping the unit.
+#
+# Cost: ~15-20% generation speed. Re-test any future upstream build with the
+# reproducer in LLAMA_ISSUES_SUMMARY.md BEFORE unpinning.
+# --------------------------------------------------------------------------
+ROLLBACK_BIN="/home/mornel/llama.cpp/bin-backup-4d828bd1a"
+export LD_LIBRARY_PATH="${ROLLBACK_BIN}:/opt/rocm-7.2.4/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-exec /home/mornel/llama.cpp/build/bin/llama-server \
+exec "${ROLLBACK_BIN}/llama-server" \
   \
   `# MODEL CONFIGURATION` \
   -m /home/mornel/models/Bielik-11B-v3.0-Instruct.Q8_0.gguf \
